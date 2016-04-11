@@ -3,22 +3,24 @@
 # Copyright 2011 Ian Goldberg
 #
 # This file is part of Sphinx.
-# 
+#
 # Sphinx is free software: you can redistribute it and/or modify
 # it under the terms of version 3 of the GNU Lesser General Public
 # License as published by the Free Software Foundation.
-# 
+#
 # Sphinx is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Lesser General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Lesser General Public
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
 import sys
 import os
+from binascii import hexlify, unhexlify
+
 from SphinxParams import SphinxParams
 from SphinxNode import SphinxNode, Denc, Dspec, pad_body, unpad_body
 from SphinxNymserver import Nymserver
@@ -32,7 +34,7 @@ def rand_subset(lst, nu):
     nodeids.sort(key=lambda x:x[0])
 
     # Return the first nu elements of the randomized list
-    return map(lambda x:x[1], nodeids[:nu])
+    return list(map(lambda x:x[1], nodeids[:nu]))
 
 
 def create_header(params, nodelist, dest, id):
@@ -49,42 +51,42 @@ def create_header(params, nodelist, dest, id):
     blinds = [x]
     asbtuples = []
     for node in nodelist:
-	alpha = group.multiexpon(group.g, blinds)
-	s = group.multiexpon(pki[node].y, blinds)
-	b = p.hb(alpha,s)
-	blinds.append(b)
-	asbtuples.append({ 'alpha': alpha, 's': s, 'b': b})
+        alpha = group.multiexpon(group.g, blinds)
+        s = group.multiexpon(pki[node].y, blinds)
+        b = p.hb(alpha,s)
+        blinds.append(b)
+        asbtuples.append({ 'alpha': alpha, 's': s, 'b': b})
 
     # Compute the filler strings
-    phi = ''
-    for i in xrange(1,nu):
-	min = (2*(p.r-i)+3)*p.k
-	phi = p.xor(phi + ("\x00" * (2*p.k)),
-	    p.rho(p.hrho(asbtuples[i-1]['s']))[min:])
-	# print i,phi.encode("hex")
+    phi = b''
+    for i in range(1,nu):
+        min = (2*(p.r-i)+3)*p.k
+        phi = p.xor(phi + (b"\x00" * (2*p.k)),
+            p.rho(p.hrho(asbtuples[i-1]['s']))[min:])
+        # print(i, hexlify(phi))
 
     # Compute the (beta, gamma) tuples
     # The os.urandom used to be a string of 0x00 bytes, but that's wrong
-    beta = dest + id + os.urandom(((2 * (p.r - nu) + 2)*p.k - len(dest)))
+    beta = dest + id + os.urandom(((2 *  (p.r - nu) + 2)*p.k - len(dest)))
     beta = p.xor(beta,
-	p.rho(p.hrho(asbtuples[nu-1]['s']))[:(2*(p.r-nu)+3)*p.k]) + phi
+                 p.rho(p.hrho(asbtuples[nu-1]['s']))[:(2*(p.r-nu)+3)*p.k]) + phi
     gamma = p.mu(p.hmu(asbtuples[nu-1]['s']), beta)
-    # print "s =", group.printable(asbtuples[i]['s'])
-    # print "beta = ", beta.encode("hex")
-    # print "gamma = ", gamma.encode("hex")
-    for i in xrange(nu-2, -1, -1):
-	id = nodelist[i+1]
-	assert len(id) == p.k
-	beta = p.xor(id + gamma + beta[:(2*p.r-1)*p.k],
-	    p.rho(p.hrho(asbtuples[i]['s']))[:(2*p.r+1)*p.k])
-	gamma = p.mu(p.hmu(asbtuples[i]['s']), beta)
-	# print pki[id].name
-	# print "s =", group.printable(asbtuples[i]['s'])
-	# print "beta = ", beta.encode("hex")
-	# print "gamma = ", gamma.encode("hex")
+    # print("s = {}".format(group.printable(asbtuples[i]['s']))
+    # print("beta = {}".format(hexlify(beta))
+    # print "gamma = {}".format(gamma))
+    for i in range(nu-2, -1, -1):
+        id = nodelist[i+1]
+        assert len(id) == p.k
+        beta = p.xor(id + gamma + beta[:(2*p.r-1)*p.k],
+                     p.rho(p.hrho(asbtuples[i]['s']))[:(2*p.r+1)*p.k])
+        gamma = p.mu(p.hmu(asbtuples[i]['s']), beta)
+        # print(pki[id].name)
+        # print("s = {}".format(group.printable(asbtuples[i]['s']))
+        # print("beta = {}".format(beta))
+        # print("gamma = {}".format(gamma))
 
     return (asbtuples[0]['alpha'], beta, gamma), \
-	[x['s'] for x in asbtuples]
+        [x['s'] for x in asbtuples]
 
 
 def create_forward_message(params, nodelist, dest, msg):
@@ -96,14 +98,14 @@ def create_forward_message(params, nodelist, dest, msg):
 
     # Compute the header and the secrets
     header, secrets = create_header(params, nodelist, Dspec,
-	"\x00" * p.k)
+                                    b"\x00" * p.k)
 
-    body = pad_body(p.m, ("\x00" * p.k) + Denc(dest) + msg)
+    body = pad_body(p.m, (B"\x00" * p.k) + Denc(dest) + msg)
 
     # Compute the delta values
     delta = p.pi(p.hpi(secrets[nu-1]), body)
-    for i in xrange(nu-2, -1, -1):
-	delta = p.pi(p.hpi(secrets[i]), delta)
+    for i in range(nu-2, -1, -1):
+        delta = p.pi(p.hpi(secrets[i]), delta)
 
     return header, delta
 
@@ -124,41 +126,41 @@ def create_surb(params, nodelist, dest):
 
 class SphinxClient:
     def __init__(self, params):
-	self.id = "Client " + os.urandom(4).encode("hex")
-	self.params = params
-	params.clients[self.id] = self
-	self.keytable = {}
+        self.id = b"Client "  + hexlify(os.urandom(4))
+        self.params = params
+        params.clients[self.id] = self
+        self.keytable = {}
 
     def create_nym(self, nym, nllength):
-	"""Create a SURB for the given nym (passing through nllength
-	nodes), and send it to the nymserver."""
+        """Create a SURB for the given nym (passing through nllength
+        nodes), and send it to the nymserver."""
 
-	# Pick the list of nodes to use
-	nodelist = rand_subset(self.params.pki.keys(), nllength)
-	id, keytuple, nymtuple = create_surb(self.params, nodelist, self.id)
+        # Pick the list of nodes to use
+        nodelist = rand_subset(self.params.pki.keys(), nllength)
+        id, keytuple, nymtuple = create_surb(self.params, nodelist, self.id)
 
-	self.keytable[id] = keytuple
-	self.params.nymserver.add_surb(nym, nymtuple)
+        self.keytable[id] = keytuple
+        self.params.nymserver.add_surb(nym, nymtuple)
 
     def process(self, id, delta):
-	"Process a (still-encrypted) reply message"
-	p = self.params
-	keytuple = self.keytable.pop(id, None)
-	if keytuple == None:
-	    print "Unreadable reply message received by [%s]" % self.id
-	    return
+        """Process a (still-encrypted) reply message"""
+        p = self.params
+        keytuple = self.keytable.pop(id, None)
+        if keytuple == None:
+            print("Unreadable reply message received by [%s]".format(self.id))
+            return
 
-	ktilde = keytuple.pop(0)
-	nu = len(keytuple)
-	for i in xrange(nu-1, -1, -1):
-	    delta = p.pi(keytuple[i], delta)
-	delta = p.pii(ktilde, delta)
+        ktilde = keytuple.pop(0)
+        nu = len(keytuple)
+        for i in range(nu-1, -1, -1):
+            delta = p.pi(keytuple[i], delta)
+        delta = p.pii(ktilde, delta)
 
-	if delta[:p.k] == ("\x00" * p.k):
-	    msg = unpad_body(delta[p.k:])
-	    print "[%s] received by [%s]" % (msg, self.id)
-	else:
-	    print "Corrupted message received by [%s]" % self.id
+        if delta[:p.k] == (b"\x00" * p.k):
+            msg = unpad_body(delta[p.k:])
+            print("[{}] received by [{}]".format(msg.decode(), self.id.decode()))
+        else:
+            print("Corrupted message received by [{}]".format(self.id.decode()))
 
 if __name__ == '__main__':
     use_ecc = (len(sys.argv) > 1 and sys.argv[1] == "-ecc")
@@ -166,8 +168,8 @@ if __name__ == '__main__':
     params = SphinxParams(r, ecc=use_ecc)
 
     # Create some nodes
-    for i in xrange(2*r):
-	SphinxNode(params)
+    for i in range(2*r):
+        SphinxNode(params)
 
     # Create a client
     client = SphinxClient(params)
@@ -175,14 +177,14 @@ if __name__ == '__main__':
     # Pick a list of nodes to use
     use_nodes = rand_subset(params.pki.keys(), r)
 
-    header, delta = create_forward_message(params, use_nodes, "dest", \
-	"this is a test")
+    header, delta = create_forward_message(params, use_nodes, b"dest", \
+                                           b"this is a test")
 
     # Send it to the first node for processing
     params.pki[use_nodes[0]].process(header, delta)
 
     # Create a reply block for the client
-    client.create_nym("cypherpunk", r)
+    client.create_nym(b"cypherpunk", r)
 
     # Send a message to it
-    params.nymserver.send_to_nym("cypherpunk", "this is a reply")
+    params.nymserver.send_to_nym(b"cypherpunk", b"this is a reply")
