@@ -122,6 +122,7 @@ class SphinxClient:
         self.params = params
         params.clients[self.id] = self
         self.keytable = {}
+        self.received = []
 
     def create_nym(self, nym, nllength):
         """Create a SURB for the given nym (passing through nllength
@@ -151,6 +152,7 @@ class SphinxClient:
         if delta[:p.k] == ("\x00" * p.k):
             msg = unpad_body(delta[p.k:])
             print "[%s] received by [%s]" % (msg, self.id)
+            self.received.append(msg)
         else:
             print "Corrupted message received by [%s]" % self.id
 

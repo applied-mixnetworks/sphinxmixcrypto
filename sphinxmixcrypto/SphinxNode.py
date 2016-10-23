@@ -60,6 +60,7 @@ class SphinxNode:
         return None, None, None
 
     def __init__(self, params):
+        self.received = []
         self.p = params
         group = self.p.group
         self.__x = group.gensecret()
@@ -122,6 +123,7 @@ class SphinxNode:
                 if type == "dest":
                     # We're to deliver rest (unpadded) to val
                     body = unpad_body(rest)
+                    self.received.append(body)
                     print "Deliver [%s] to [%s]" % (body, val)
                     return
 
