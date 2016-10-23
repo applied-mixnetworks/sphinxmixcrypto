@@ -44,6 +44,18 @@ def Denc(dest):
 # Sphinx nodes
 
 class SphinxNode:
+    def __init__(self, params):
+        self.received = []
+        self.p = params
+        group = self.p.group
+        self.__x = group.gensecret()
+        self.y = group.expon(group.g, self.__x)
+        idnum = os.urandom(4)
+        self.id = self.__Nenc(idnum)
+        self.name = "Node " + idnum.encode("hex")
+        self.seen = {}
+        params.pki[self.id] = self
+
     def __Nenc(self, idnum):
         id = "\xff" + idnum + ("\x00" * (self.p.k - len(idnum) - 1))
         assert len(id) == self.p.k
@@ -59,17 +71,6 @@ class SphinxNode:
         if l < 128: return 'dest', s[1:l+1], s[l+1:]
         return None, None, None
 
-    def __init__(self, params):
-        self.received = []
-        self.p = params
-        group = self.p.group
-        self.__x = group.gensecret()
-        self.y = group.expon(group.g, self.__x)
-        idnum = os.urandom(4)
-        self.id = self.__Nenc(idnum)
-        self.name = "Node " + idnum.encode("hex")
-        self.seen = {}
-        params.pki[self.id] = self
 
     def process(self, header, delta):
         print "Processing at", self.name
