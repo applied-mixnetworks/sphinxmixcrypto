@@ -20,9 +20,9 @@
 
 import sys
 
-from sphinxmixnet.SphinxParams import SphinxParams
-from sphinxmixnet.SphinxNode import SphinxNode
-from sphinxmixnet.SphinxClient import SphinxClient, rand_subset, create_forward_message
+from sphinxmixcrypto.SphinxParams import SphinxParams
+from sphinxmixcrypto.SphinxNode import SphinxNode
+from sphinxmixcrypto.SphinxClient import SphinxClient, rand_subset, create_forward_message
 
 def main():
     use_ecc = (len(sys.argv) > 1 and sys.argv[1] == "-ecc")

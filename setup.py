@@ -11,11 +11,11 @@ description = '''
 '''
 
 setup(
-    name='sphinxmixnet',
+    name='sphinxmixcrypto',
     version='0.0.1',
     description=description,
     long_description=open('README', 'r').read(),
-    keywords=['python','mixnet'],
+    keywords=['python','mixnet', 'cryptography', 'anonymity'],
     install_requires=open('requirements.txt').readlines(),
     classifiers=[
         'Topic :: Security',
@@ -24,5 +24,5 @@ setup(
     #author_email=__contact__,
     #url=__url__,
     #license=__license__,
-    packages=["sphinxmixnet"],
+    packages=["sphinxmixcrypto"],
 )
