@@ -45,95 +45,95 @@ def Denc(dest):
 
 class SphinxNode:
     def __Nenc(self, idnum):
-	id = "\xff" + idnum + ("\x00" * (self.p.k - len(idnum) - 1))
-	assert len(id) == self.p.k
-	return id
+        id = "\xff" + idnum + ("\x00" * (self.p.k - len(idnum) - 1))
+        assert len(id) == self.p.k
+        return id
 
     # Decode the prefix-free encoding.  Return the type, value, and the
     # remainder of the input string
     def __PFdecode(self, s):
-	if s == "": return None, None, None
-	if s[0] == '\x00': return 'Dspec', None, s[1:]
-	if s[0] == '\xff': return 'node', s[:self.p.k], s[self.p.k:]
-	l = ord(s[0])
-	if l < 128: return 'dest', s[1:l+1], s[l+1:]
-	return None, None, None
+        if s == "": return None, None, None
+        if s[0] == '\x00': return 'Dspec', None, s[1:]
+        if s[0] == '\xff': return 'node', s[:self.p.k], s[self.p.k:]
+        l = ord(s[0])
+        if l < 128: return 'dest', s[1:l+1], s[l+1:]
+        return None, None, None
 
     def __init__(self, params):
-	self.p = params
-	group = self.p.group
-	self.__x = group.gensecret()
-	self.y = group.expon(group.g, self.__x)
-	idnum = os.urandom(4)
-	self.id = self.__Nenc(idnum)
-	self.name = "Node " + idnum.encode("hex")
-	self.seen = {}
-	params.pki[self.id] = self
+        self.p = params
+        group = self.p.group
+        self.__x = group.gensecret()
+        self.y = group.expon(group.g, self.__x)
+        idnum = os.urandom(4)
+        self.id = self.__Nenc(idnum)
+        self.name = "Node " + idnum.encode("hex")
+        self.seen = {}
+        params.pki[self.id] = self
 
     def process(self, header, delta):
-	print "Processing at", self.name
-	p = self.p
-	pki = p.pki
-	group = p.group
-	alpha, beta, gamma = header
+        print "Processing at", self.name
+        p = self.p
+        pki = p.pki
+        group = p.group
+        alpha, beta, gamma = header
 
-	# Check that alpha is in the group
-	if not group.in_group(alpha):
-	    return
+        # Check that alpha is in the group
+        if not group.in_group(alpha):
+            return
 
-	# Compute the shared secret
-	s = group.expon(alpha, self.__x)
+        # Compute the shared secret
+        s = group.expon(alpha, self.__x)
 
-	# Have we seen it already?
-	tag = p.htau(s)
+        # Have we seen it already?
+        tag = p.htau(s)
 
-	if tag in self.seen:
-	    return
+        if tag in self.seen:
+            return
 
-	if gamma != p.mu(p.hmu(s), beta):
-	    print "MAC mismatch!"
-	    print "alpha =", group.printable(alpha)
-	    print "s =", group.printable(s)
-	    print "beta =", beta.encode("hex")
-	    print "gamma =", gamma.encode("hex")
-	    return
+        if gamma != p.mu(p.hmu(s), beta):
+            print "MAC mismatch!"
+            print "alpha =", group.printable(alpha)
+            print "s =", group.printable(s)
+            print "beta =", beta.encode("hex")
+            print "gamma =", gamma.encode("hex")
+            return
 
-	self.seen[tag] = 1
+        self.seen[tag] = 1
 
-	B = p.xor(beta + ("\x00" * (2 * p.k)), p.rho(p.hrho(s)))
+        B = p.xor(beta + ("\x00" * (2 * p.k)), p.rho(p.hrho(s)))
 
-	type, val, rest = self.__PFdecode(B)
+        type, val, rest = self.__PFdecode(B)
 
-	if type == "node":
-	    print "Next hop is", pki[val].name
-	    b = p.hb(alpha, s)
-	    alpha = group.expon(alpha, b)
-	    gamma = B[p.k:p.k*2]
-	    beta = B[p.k*2:]
-	    delta = p.pii(p.hpi(s), delta)
-	    return pki[val].process((alpha, beta, gamma), delta)
+        if type == "node":
+            print "Next hop is", pki[val].name
+            b = p.hb(alpha, s)
+            alpha = group.expon(alpha, b)
+            gamma = B[p.k:p.k*2]
+            beta = B[p.k*2:]
+            delta = p.pii(p.hpi(s), delta)
+            return pki[val].process((alpha, beta, gamma), delta)
 
-	if type == "Dspec":
-	    # Uncomment the following to see what the exit node sees
-	    # print ' '.join(["%02x"%ord(x) for x in B])
-	    delta = p.pii(p.hpi(s), delta)
-	    if delta[:p.k] == ("\x00" * p.k):
-		type, val, rest = self.__PFdecode(delta[p.k:])
-		if type == "dest":
-		    # We're to deliver rest (unpadded) to val
-		    body = unpad_body(rest)
-		    print "Deliver [%s] to [%s]" % (body, val)
-		    return
+        if type == "Dspec":
+            # Uncomment the following to see what the exit node sees
+            # print ' '.join(["%02x"%ord(x) for x in B])
+            delta = p.pii(p.hpi(s), delta)
+            if delta[:p.k] == ("\x00" * p.k):
+                type, val, rest = self.__PFdecode(delta[p.k:])
+                if type == "dest":
+                    # We're to deliver rest (unpadded) to val
+                    body = unpad_body(rest)
+                    print "Deliver [%s] to [%s]" % (body, val)
+                    return
 
-	if type == "dest":
-	    id = rest[:p.k]
-	    delta = p.pii(p.hpi(s), delta)
-	    print "Deliver reply message to [%s]" % val
-	    if val in p.clients:
-		return p.clients[val].process(id, delta)
-	    else:
-		print "No such client [%s]" % val
-		return
+        if type == "dest":
+            id = rest[:p.k]
+            delta = p.pii(p.hpi(s), delta)
+            print "Deliver reply message to [%s]" % val
+            if val in p.clients:
+                return p.clients[val].process(id, delta)
+            else:
+                print "No such client [%s]" % val
+                return
 
 if __name__ == '__main__':
 

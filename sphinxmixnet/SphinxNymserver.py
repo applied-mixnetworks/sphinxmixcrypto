@@ -21,24 +21,24 @@ from SphinxNode import pad_body
 
 class Nymserver:
     def __init__(self, params):
-	self.params = params
-	self.database = {}
+        self.params = params
+        self.database = {}
 
     def add_surb(self, nym, nymtuple):
-	db = self.database
-	if nym in db:
-	    db[nym].append(nymtuple)
-	else:
-	    db[nym] = [nymtuple]
+        db = self.database
+        if nym in db:
+            db[nym].append(nymtuple)
+        else:
+            db[nym] = [nymtuple]
 
     def send_to_nym(self, nym, message):
-	p = self.params
-	pki = p.pki
-	db = self.database
-	print "Nymserver received message for [%s]" % nym
-	if nym in db and len(db[nym]) > 0:
-	    n0, header0, ktilde = db[nym].pop(0)
-	    body = p.pi(ktilde, pad_body(p.m, ("\x00" * p.k) + message))
-	    pki[n0].process(header0, body)
-	else:
-	    print "No SURBs available for nym [%s]" % nym
+        p = self.params
+        pki = p.pki
+        db = self.database
+        print "Nymserver received message for [%s]" % nym
+        if nym in db and len(db[nym]) > 0:
+            n0, header0, ktilde = db[nym].pop(0)
+            body = p.pi(ktilde, pad_body(p.m, ("\x00" * p.k) + message))
+            pki[n0].process(header0, body)
+        else:
+            print "No SURBs available for nym [%s]" % nym

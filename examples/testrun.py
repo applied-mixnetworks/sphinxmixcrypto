@@ -19,11 +19,9 @@
 
 
 import sys
-import os
 
 from sphinxmixnet.SphinxParams import SphinxParams
-from sphinxmixnet.SphinxNode import SphinxNode, Denc, Dspec, pad_body, unpad_body
-from sphinxmixnet.SphinxNymserver import Nymserver
+from sphinxmixnet.SphinxNode import SphinxNode
 from sphinxmixnet.SphinxClient import SphinxClient, rand_subset, create_forward_message
 
 def main():
@@ -33,7 +31,7 @@ def main():
 
     # Create some nodes
     for i in xrange(2*r):
-	SphinxNode(params)
+        SphinxNode(params)
 
     # Create a client
     client = SphinxClient(params)
@@ -42,7 +40,7 @@ def main():
     use_nodes = rand_subset(params.pki.keys(), r)
 
     header, delta = create_forward_message(params, use_nodes, "dest", \
-	"this is a test")
+        "this is a test")
 
     # Send it to the first node for processing
     params.pki[use_nodes[0]].process(header, delta)
