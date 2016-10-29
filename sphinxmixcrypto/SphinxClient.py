@@ -116,13 +116,23 @@ def create_surb(params, nodelist, dest):
     return id, keytuple, (nodelist[0], header, ktilde)
 
 
+class ClientMessage:
+    def __init__(self):
+        self.payload = None
+        self.error_nym_key_not_found = False
+        self.error_corrupt_message = False
+    def has_error(self):
+        if self.error_nym_key_not_found or self.error_corrupt_message:
+            return True
+        return False
+
+
 class SphinxClient:
     def __init__(self, params):
         self.id = "Client " + os.urandom(4).encode("hex")
         self.params = params
         params.clients[self.id] = self
         self.keytable = {}
-        self.received = []
 
     def create_nym(self, nym, nllength):
         """Create a SURB for the given nym (passing through nllength
@@ -136,12 +146,16 @@ class SphinxClient:
         self.params.nymserver.add_surb(nym, nymtuple)
 
     def process(self, id, delta):
-        "Process a (still-encrypted) reply message"
+        """
+        Process a (still-encrypted) reply message
+        """
+        message = ClientMessage()
         p = self.params
         keytuple = self.keytable.pop(id, None)
+
         if keytuple == None:
-            print "Unreadable reply message received by [%s]" % self.id
-            return
+            message.error_nym_key_not_found = True
+            return message
 
         ktilde = keytuple.pop(0)
         nu = len(keytuple)
@@ -151,8 +165,8 @@ class SphinxClient:
 
         if delta[:p.k] == ("\x00" * p.k):
             msg = unpad_body(delta[p.k:])
-            print "[%s] received by [%s]" % (msg, self.id)
-            self.received.append(msg)
-        else:
-            print "Corrupted message received by [%s]" % self.id
+            message.tuple_message = (self.id, msg)
+            return message
 
+        message.error_corrupt_message = True
+        return message

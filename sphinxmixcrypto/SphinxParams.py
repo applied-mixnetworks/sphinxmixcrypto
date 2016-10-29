@@ -247,8 +247,3 @@ class SphinxParams:
         "Compute a hash of s to use to see if we've seen s before"
         group = self.group
         return (self.hash("htau:" + group.printable(s)))
-
-if __name__ == '__main__':
-    p = SphinxParams(5, True)
-    print p.hb(p.group.g, p.group.g).encode("hex")
-    print p.rho("1234" * 4).encode("hex")

@@ -110,7 +110,6 @@ class SphinxNode:
         """
         process returns a MessageResult given a header and payload
         """
-        print "node %s running process\n" % (self.name,)
         result = MessageResult()
         p = self.p
         pki = p.pki

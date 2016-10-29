@@ -56,7 +56,7 @@ class TestECCGroup(unittest.TestCase):
 
         def send_to_client(client_id, message_id, delta):
             print "send_to_client"
-            self.params.clients[client_id].process(message_id, delta)
+            return self.params.clients[client_id].process(message_id, delta)
 
         def send_to_mix(destination, header, payload):
             print "send_to_mix"
@@ -76,7 +76,9 @@ class TestECCGroup(unittest.TestCase):
                     break
                 elif result.tuple_client_hop:
                     print "client hop"
-                    send_to_client(*result.tuple_client_hop)
+                    result = send_to_client(*result.tuple_client_hop)
+                    self.failIf(result.has_error())
+                    print "[%s] received by [%s]" % (result.tuple_message[1], result.tuple_message[0])
                     break
 
         mixnet_test_state_machine(result)
@@ -86,8 +88,14 @@ class TestECCGroup(unittest.TestCase):
         self.client.create_nym("cypherpunk", self.r)
         # Send a message to it
         reply_message = "this is a reply"
-        nym_result = self.params.nymserver.process("cypherpunk", reply_message)
+        nym_id = "cypherpunk"
+
+        print "Nymserver received message for [%s]" % nym_id
+        nym_result = self.params.nymserver.process(nym_id, reply_message)
+
+        print "Nymserver received message for [%s]" % nym_id
+        if nym_result.has_error():
+            print "No SURBs available for nym [%s]" % nym_id
         self.failIf(nym_result.has_error())
 
         mixnet_test_state_machine(nym_result.message_result)
-        self.failUnlessEqual(self.client.received[0], reply_message)
