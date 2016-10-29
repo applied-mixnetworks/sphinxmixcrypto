@@ -22,7 +22,6 @@
 # packet format by George Danezis".
 
 import os
-import struct
 
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256, HMAC
