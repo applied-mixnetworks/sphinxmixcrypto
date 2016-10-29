@@ -17,7 +17,17 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-from SphinxNode import pad_body
+from SphinxNode import pad_body, MessageResult
+
+class NymResult:
+    def __init__(self):
+        self.error_no_surbs_available = False
+        self.message_result = None
+
+    def has_error(self):
+        if self.error_no_surbs_available:
+            return True
+        return False
 
 class Nymserver:
     def __init__(self, params):
@@ -31,7 +41,8 @@ class Nymserver:
         else:
             db[nym] = [nymtuple]
 
-    def send_to_nym(self, nym, message):
+    def process(self, nym, message):
+        result = NymResult()
         p = self.params
         pki = p.pki
         db = self.database
@@ -39,6 +50,11 @@ class Nymserver:
         if nym in db and len(db[nym]) > 0:
             n0, header0, ktilde = db[nym].pop(0)
             body = p.pi(ktilde, pad_body(p.m, ("\x00" * p.k) + message))
-            pki[n0].process(header0, body)
+            #pki[n0].process(header0, body)
+            message = MessageResult()
+            message.tuple_next_hop = (n0, header0, body)
+            result.message_result = message
         else:
             print "No SURBs available for nym [%s]" % nym
+            result.error_no_surbs_available = True
+        return result

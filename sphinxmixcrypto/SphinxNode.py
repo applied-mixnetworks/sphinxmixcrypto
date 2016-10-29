@@ -56,7 +56,26 @@ def destination_encode(dest):
     assert len(dest) >= 1 and len(dest) <= 127
     return chr(len(dest)) + dest
 
-# Sphinx nodes
+
+class MessageResult:
+    def __init__(self):
+        self.error_invalid_message_type = False
+        self.error_invalid_dspec = False
+        self.error_no_such_client = False
+        self.error_not_in_alpha_group = False
+        self.error_tag_seen_already = False
+        self.error_mac_mismatch = False
+        self.tuple_next_hop = ()
+        self.tuple_exit_hop = ()
+        self.tuple_client_hop = ()
+
+    def has_error(self):
+        for err in filter(lambda x: x.startswith('error'), dir(self)):
+            if getattr(self, err):
+                #raise Exception("err %s is %s" % (err, getattr(self, err)))
+                print "err %s is %s" % (err, getattr(self, err))
+                return True
+        return False
 
 class SphinxNode:
     def __init__(self, params):
@@ -87,78 +106,63 @@ class SphinxNode:
         return None, None, None
 
 
-    def process(self, header, delta):
-        print "Processing at", self.name
+    def process(self, header, payload):
+        """
+        process returns a MessageResult given a header and payload
+        """
+        print "node %s running process\n" % (self.name,)
+        result = MessageResult()
         p = self.p
         pki = p.pki
         group = p.group
         alpha, beta, gamma = header
 
-        # Check that alpha is in the group
         if not group.in_group(alpha):
-            return
-
-        # Compute the shared secret
+            result.error_not_in_alpha_group = True
+            return result
         s = group.expon(alpha, self.__x)
-
-        # Have we seen it already?
         tag = p.htau(s)
 
         if tag in self.seen:
-            return
-
+            result.error_tag_seen_already = True
+            return result
         if gamma != p.mu(p.hmu(s), beta):
-            print "MAC mismatch!"
-            print "alpha =", group.printable(alpha)
-            print "s =", group.printable(s)
-            print "beta =", beta.encode("hex")
-            print "gamma =", gamma.encode("hex")
-            return
+            result.error_mac_mismatch = True
+            return result
 
         self.seen[tag] = 1
-
         B = p.xor(beta + ("\x00" * (2 * p.k)), p.rho(p.hrho(s)))
-
         type, val, rest = self.__PFdecode(B)
 
         if type == "node":
-            print "Next hop is", pki[val].name
             b = p.hb(alpha, s)
             alpha = group.expon(alpha, b)
             gamma = B[p.k:p.k*2]
             beta = B[p.k*2:]
-            delta = p.pii(p.hpi(s), delta)
-            return pki[val].process((alpha, beta, gamma), delta)
-
-        if type == "Dspec":
-            # Uncomment the following to see what the exit node sees
-            # print ' '.join(["%02x"%ord(x) for x in B])
-            delta = p.pii(p.hpi(s), delta)
-            if delta[:p.k] == ("\x00" * p.k):
-                type, val, rest = self.__PFdecode(delta[p.k:])
+            payload = p.pii(p.hpi(s), payload)
+            result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
+            return result
+        elif type == "Dspec":
+            payload = p.pii(p.hpi(s), payload)
+            if payload[:p.k] == ("\x00" * p.k):
+                type, val, rest = self.__PFdecode(payload[p.k:])
                 if type == "dest":
                     # We're to deliver rest (unpadded) to val
                     body = unpad_body(rest)
                     self.received.append(body)
-                    print "Deliver [%s] to [%s]" % (body, val)
-                    return
-
-        if type == "dest":
+                    result.tuple_exit_hop = (val, body)
+                    return result
+            result.error_invalid_dspec = True
+            return result
+        elif type == "dest":
             id = rest[:p.k]
-            delta = p.pii(p.hpi(s), delta)
-            print "Deliver reply message to [%s]" % val
+            payload = p.pii(p.hpi(s), payload)
             if val in p.clients:
-                return p.clients[val].process(id, delta)
+                result.tuple_client_hop = (val, id, payload)
+                return result
             else:
-                print "No such client [%s]" % val
-                return
+                result.error_no_such_client = True
+                return result
 
-if __name__ == '__main__':
-
-    from SphinxParams import SphinxParams
-
-    p = SphinxParams()
-    n = SphinxNode(p)
-
-    print "name =", n.name
-    print "y =", n.y
+        result.error_invalid_message_type = True
+        return result
