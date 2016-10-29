@@ -105,13 +105,10 @@ class SphinxParams:
     pki = {} # mapping of node id to node
     clients = {} # mapping of destinations to clients
 
-    def __init__(self, r=5, ecc=False):
+    def __init__(self, r=5, group_class=None):
         self.r = r
-        if ecc:
-            self.group = Group_ECC()
-        else:
-            self.group = Group_p()
-
+        assert group_class is not None
+        self.group = group_class()
         self.nymserver = Nymserver(self)
 
     def xor(self, str1, str2):

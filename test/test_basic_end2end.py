@@ -1,7 +1,7 @@
 
 import unittest
 
-from sphinxmixcrypto.SphinxParams import SphinxParams
+from sphinxmixcrypto.SphinxParams import SphinxParams, Group_p
 from sphinxmixcrypto.SphinxNode import SphinxNode
 from sphinxmixcrypto.SphinxClient import SphinxClient, rand_subset, create_forward_message
 
@@ -10,7 +10,7 @@ class TestStringMethods(unittest.TestCase):
 
     def setUp(self):
         self.r = 5
-        self.params = SphinxParams(self.r, ecc=False)
+        self.params = SphinxParams(self.r, group_class = Group_p)
 
         # Create some nodes
         for i in xrange(2*self.r):
