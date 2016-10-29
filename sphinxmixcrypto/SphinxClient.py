@@ -18,7 +18,7 @@
 # <http://www.gnu.org/licenses/>.
 
 import os
-from SphinxNode import Denc, Dspec, pad_body, unpad_body
+from SphinxNode import destination_encode, DSPEC, pad_body, unpad_body
 
 def rand_subset(lst, nu):
     """Return a list of nu random elements of the given list (without
@@ -91,10 +91,10 @@ def create_forward_message(params, nodelist, dest, msg):
     assert p.k + 1 + len(dest) + len(msg) < p.m
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, nodelist, Dspec,
+    header, secrets = create_header(params, nodelist, DSPEC,
         "\x00" * p.k)
 
-    body = pad_body(p.m, ("\x00" * p.k) + Denc(dest) + msg)
+    body = pad_body(p.m, ("\x00" * p.k) + destination_encode(dest) + msg)
 
     # Compute the delta values
     delta = p.pi(p.hpi(secrets[nu-1]), body)
@@ -108,7 +108,7 @@ def create_surb(params, nodelist, dest):
     id = os.urandom(p.k)
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, nodelist, Denc(dest), id)
+    header, secrets = create_header(params, nodelist, destination_encode(dest), id)
 
     ktilde = os.urandom(p.k)
     keytuple = [ktilde]

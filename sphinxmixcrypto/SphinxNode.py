@@ -3,19 +3,23 @@
 # Copyright 2011 Ian Goldberg
 #
 # This file is part of Sphinx.
-# 
+#
 # Sphinx is free software: you can redistribute it and/or modify
 # it under the terms of version 3 of the GNU Lesser General Public
 # License as published by the Free Software Foundation.
-# 
+#
 # Sphinx is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Lesser General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Lesser General Public
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
+
+"""
+This SphinxNode module includes cryptographic algorithms for mix net nodes
+"""
 
 import os
 import re
@@ -24,20 +28,31 @@ import re
 # bits as it takes to fill it up
 
 def pad_body(msgtotalsize, body):
+    """
+    pad_body appends padding to the body of a message.
+    Given the total size and the message data a new
+    padded message is returned.
+    """
     body = body + "\x7f"
     body = body + ("\xff" * (msgtotalsize - len(body)))
     return body
 
 def unpad_body(body):
-    return re.compile("\x7f\xff*$").sub('',body)
+    """
+    unpad_body performs the inverse of pad_body
+    """
+    return re.compile("\x7f\xff*$").sub('', body)
 
 # Prefix-free encoding/decoding of node names and destinations
 
 # The special destination
-Dspec = "\x00"
+DSPEC = "\x00"
 
 # Any other destination.  Must be between 1 and 127 bytes in length
-def Denc(dest):
+def destination_encode(dest):
+    """
+    encode destination
+    """
     assert len(dest) >= 1 and len(dest) <= 127
     return chr(len(dest)) + dest
 
