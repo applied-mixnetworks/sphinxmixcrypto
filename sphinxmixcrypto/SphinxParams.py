@@ -33,11 +33,6 @@ except:
     print "\n\n*** You need to install the Python Cryptography Toolkit. ***\n\n"
     raise
 
-try:
-    from curvedh import *
-except:
-    pass
-
 class Group_p:
     "Group operations mod p"
 
