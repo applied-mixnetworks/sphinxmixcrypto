@@ -22,16 +22,16 @@
 # packet format by George Danezis".
 
 import os
+import struct
+
+from Crypto.Cipher import AES
+from Crypto.Hash import SHA256, HMAC
+from Crypto.Util import number
+from Crypto.Util.strxor import strxor
+from nacl.bindings import crypto_scalarmult
+
 from SphinxNymserver import Nymserver
 
-try:
-    from Crypto.Cipher import AES
-    from Crypto.Hash import SHA256, HMAC
-    from Crypto.Util import number
-    from Crypto.Util.strxor import strxor
-except:
-    print "\n\n*** You need to install the Python Cryptography Toolkit. ***\n\n"
-    raise
 
 class Group_p:
     "Group operations mod p"
@@ -70,13 +70,33 @@ class Group_ECC:
 
     def __init__(self):
 
-        self.g = basepoint()
+        self.g = self.basepoint()
+
+    def basepoint(self):
+        curve_bytes = []
+        curve_bytes.append(b'\x09')
+        for i in range(1,32):
+            curve_bytes.append(b'\x00')
+        return str(bytearray(curve_bytes))
+
+    def makesecret(self, exp):
+        """
+        makesecret takes a byte string and converts them to a list of one byte integers
+        before doing some bit manipulations and then returns the list of one byte ints
+        """
+        curve_out = []
+        for c in exp:
+            curve_out.append(ord(c))
+        curve_out[0] &= 248
+        curve_out[31] &= 127
+        curve_out[31] |= 64
+        return str(bytearray(curve_out))
 
     def gensecret(self):
-        return makesecret(os.urandom(32))
+        return self.makesecret(os.urandom(32))
 
     def expon(self, base, exp):
-        return curvedh(exp, base)
+        return crypto_scalarmult(exp, base)
 
     def multiexpon(self, base, exps):
         baseandexps = [base]
@@ -85,7 +105,7 @@ class Group_ECC:
 
     def makeexp(self, data):
         assert len(data) == 32
-        return makesecret(data)
+        return self.makesecret(data)
 
     def in_group(self, alpha):
         # All strings of length 32 are in the group, says DJB
