@@ -115,19 +115,6 @@ class Group_ECC:
     def printable(self, alpha):
         return alpha.encode("hex")
 
-
-class xcounter:
-    # Implements a string counter to do AES-CTR mode
-    i = 0
-    def __init__(self, size):
-        self.size = size
-
-    def __call__(self):
-        ii = number.long_to_bytes(self.i)
-        ii = '\x00' * (self.size-len(ii)) + ii
-        self.i += 1
-        return ii
-
 def SHA256_hash(data):
     h = SHA256.new()
     h.update(data)
@@ -139,6 +126,17 @@ def Blake2_hash(data):
     return h[:32]
 
 def AES_stream_cipher(key):
+    class xcounter:
+        def __init__(self, size):
+            self.i = 0
+            self.size = size
+        def __call__(self):
+            if self.i > self.size:
+                raise Exception("AES_stream_cipher counter exhausted.")
+            ii = number.long_to_bytes(self.i)
+            ii = '\x00' * (self.size-len(ii)) + ii
+            self.i += 1
+            return ii
     return AES.new(key, AES.MODE_CTR, counter=xcounter(16))
 
 def Chacha20_stream_cipher(key):
