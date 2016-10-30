@@ -3,20 +3,25 @@
 # Copyright 2011 Ian Goldberg
 #
 # This file is part of Sphinx.
-# 
+#
 # Sphinx is free software: you can redistribute it and/or modify
 # it under the terms of version 3 of the GNU Lesser General Public
 # License as published by the Free Software Foundation.
-# 
+#
 # Sphinx is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Lesser General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Lesser General Public
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 #
+
+"""
+This module is used to parameterize the crypto primitive are used in
+mixnet packets.
+"""
 
 import os
 
@@ -30,21 +35,35 @@ from Cryptodome.Cipher import ChaCha20
 
 from pylioness import Chacha20_Blake2b_Lioness, AES_SHA256_Lioness
 
-from SphinxNymserver import Nymserver
+from sphinxmixcrypto.SphinxNymserver import Nymserver
 
 
-class Group_p:
+class GroupP:
     "Group operations mod p"
 
     def __init__(self):
         # A 2048-bit prime
-        self.__p = 19134104382515471340121383082934308828788465164876922483018046665189568608385336521385528455852870226729419515782445769946311524543401780679763787388729547181989737060289407062479214017446428251157469940819568673215805731815521523529008837868909929585628774673216239536406270201585439559139691697966359990510412034461369768357756615060575177060679433618196595458284826534928911045879135540240765445688036648761768417624100416438042808407759355983611319236017991473072964105392335897160201662655194201702312372678481213560443558381777521284259428911914008097936688649209670009892790669991823472515537714171774700422727L
+        self.__p = 1913410438251547134012138308293430882878846516487692248301804666518956860838 + \
+        533652138552845585287022672941951578244576994631152454340178067976378738872954718198973 + \
+        706028940706247921401744642825115746994081956867321580573181552152352900883786890992958 + \
+        562877467321623953640627020158543955913969169796635999051041203446136976835775661506057 + \
+        517706067943361819659545828482653492891104587913554024076544568803664876176841762410041 + \
+        643804280840775935598361131923601799147307296410539233589716020166265519420170231237267 + \
+        848121356044355838177752128425942891191400809793668864920967000989279066999182347251553 + \
+        7714171774700422727L
 
         # A 256-bit prime.  q | p-1, and (p-1)/(2q) is also prime
         self.__q = 106732665057690615308701680462846682779480968671143352109289849544853387479559L
 
         # A generator of the 256-bit subgroup of order q
-        self.g = 4841394417863494412227539373591815072221868474834407003108964621656948087607533132014406209384264001860614005413470474998618595063750798301826341774223008476018405743602814857378470614748174056572493655989586557587396511347276474665778845699406935799833636365083206218330593315513720711460353255243954204178057633122609221947354829869069875474221603457407347332029203573680170785191212685833773827500371044142146648183369300927714600114538209692069873794191715382617278768149594654315895296485533292574866819385073141870483659577707892565451842181763727355979252885729688362656338077037492411991956527093735651034592L
+        self.generator = 484139441786349441222753937359181507222186847483440700310896462165694808760753 + \
+                 313201440620938426400186061400541347047499861859506375079830182634177422300847 + \
+                 601840574360281485737847061474817405657249365598958655758739651134727647466577 + \
+                 884569940693579983363636508320621833059331551372071146035325524395420417805763 + \
+                 312260922194735482986906987547422160345740734733202920357368017078519121268583 + \
+                 377382750037104414214664818336930092771460011453820969206987379419171538261727 + \
+                 876814959465431589529648553329257486681938507314187048365957770789256545184218 + \
+                 1763727355979252885729688362656338077037492411991956527093735651034592L
 
     def gensecret(self):
         return number.bytes_to_long(os.urandom(256)) % self.__q
@@ -53,7 +72,7 @@ class Group_p:
         return pow(base, exp, self.__p)
 
     def multiexpon(self, base, exps):
-        return pow(base, reduce(lambda x,y: x*y % self.__q, exps), self.__p)
+        return pow(base, reduce(lambda x, y: x*y % self.__q, exps), self.__p)
 
     def makeexp(self, data):
         return number.bytes_to_long(data) % self.__q
@@ -66,17 +85,17 @@ class Group_p:
         return str(alpha)
 
 
-class Group_ECC:
+class GroupECC:
     "Group operations in ECC"
 
     def __init__(self):
 
-        self.g = self.basepoint()
+        self.generator = self.basepoint()
 
     def basepoint(self):
         curve_bytes = []
         curve_bytes.append(b'\x09')
-        for i in range(1,32):
+        for i in range(1, 32):
             curve_bytes.append(b'\x00')
         return str(bytearray(curve_bytes))
 
@@ -200,7 +219,7 @@ class SphinxParams:
     def rho(self, key):
         assert len(key) == self.k
         c = self.stream_cipher(key)
-        return c.encrypt("\x00" * ( (2 * self.r + 3) * self.k ))
+        return c.encrypt("\x00" * ((2 * self.r + 3) * self.k))
 
     # The HMAC; key is of length k, output is of length k
     def mu(self, key, data):
@@ -224,7 +243,7 @@ class SphinxParams:
         "Compute a hash of alpha and s to use as a blinding factor"
         group = self.group
         return group.makeexp(self.hash_func("hb:" + group.printable(alpha)
-            + " , " + group.printable(s)))
+                                            + " , " + group.printable(s)))
 
     def hrho(self, s):
         "Compute a hash of s to use as a key for the PRG rho"
@@ -239,9 +258,9 @@ class SphinxParams:
     def hpi(self, s):
         "Compute a hash of s to use as a key for the PRP pi"
         group = self.group
-        return (self.hash_func("hpi:" + group.printable(s)))[:self.k]
+        return self.hash_func("hpi:" + group.printable(s))[:self.k]
 
     def htau(self, s):
         "Compute a hash of s to use to see if we've seen s before"
         group = self.group
-        return (self.hash_func("htau:" + group.printable(s)))
+        return self.hash_func("htau:" + group.printable(s))

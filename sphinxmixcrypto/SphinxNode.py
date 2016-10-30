@@ -83,7 +83,7 @@ class SphinxNode:
         self.p = params
         group = self.p.group
         self.__x = group.gensecret()
-        self.y = group.expon(group.g, self.__x)
+        self.y = group.expon(group.generator, self.__x)
         idnum = os.urandom(4)
         self.id = self.__Nenc(idnum)
         self.name = "Node " + idnum.encode("hex")

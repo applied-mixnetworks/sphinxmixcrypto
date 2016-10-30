@@ -43,7 +43,7 @@ def create_header(params, route, node_map, dest, id):
     blinds = [x]
     asbtuples = []
     for node in route:
-        alpha = group.multiexpon(group.g, blinds)
+        alpha = group.multiexpon(group.generator, blinds)
         s = group.multiexpon(node_map[node].y, blinds)
         b = p.hb(alpha,s)
         blinds.append(b)
