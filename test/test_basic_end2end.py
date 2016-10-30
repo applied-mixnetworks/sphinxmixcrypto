@@ -1,19 +1,20 @@
 
 import unittest
 
-from sphinxmixcrypto.SphinxParams import SphinxParams, Group_p, Group_ECC
+from sphinxmixcrypto.SphinxParams import SphinxParams, Group_p, Group_ECC, Chacha_Lioness, Chacha20_stream_cipher
 from sphinxmixcrypto.SphinxNode import SphinxNode, MessageResult
 from sphinxmixcrypto.SphinxClient import SphinxClient, rand_subset, create_forward_message
-
 
 
 class TestSphinxECCGroup(unittest.TestCase):
 
     def setUp(self):
         self.r = 5
-        self.params = SphinxParams(self.r, group_class = Group_ECC)
-        #  Note that we could set group_class to Group_p like so:
-        #  self.params = SphinxParams(self.r, group_class = Group_p)
+        self.params = SphinxParams(
+            self.r, group_class = Group_ECC,
+            lioness_class = Chacha_Lioness,
+            stream_cipher = Chacha20_stream_cipher,
+        )
 
         self.node_map = {}
         # Create some nodes

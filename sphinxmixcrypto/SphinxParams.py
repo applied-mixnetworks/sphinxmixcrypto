@@ -17,9 +17,6 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 #
-# The LIONESS implementation and the xcounter CTR mode class are adapted
-# from "Experimental implementation of the sphinx cryptographic mix
-# packet format by George Danezis".
 
 import os
 
@@ -28,6 +25,10 @@ from Crypto.Hash import SHA256, HMAC
 from Crypto.Util import number
 from Crypto.Util.strxor import strxor
 from nacl.bindings import crypto_scalarmult
+from pyblake2 import blake2b
+from Cryptodome.Cipher import ChaCha20
+
+from pylioness import Chacha20_Blake2b_Lioness, AES_SHA256_Lioness
 
 from SphinxNymserver import Nymserver
 
@@ -63,6 +64,7 @@ class Group_p:
 
     def printable(self, alpha):
         return str(alpha)
+
 
 class Group_ECC:
     "Group operations in ECC"
@@ -113,86 +115,85 @@ class Group_ECC:
     def printable(self, alpha):
         return alpha.encode("hex")
 
+
+class xcounter:
+    # Implements a string counter to do AES-CTR mode
+    i = 0
+    def __init__(self, size):
+        self.size = size
+
+    def __call__(self):
+        ii = number.long_to_bytes(self.i)
+        ii = '\x00' * (self.size-len(ii)) + ii
+        self.i += 1
+        return ii
+
+
+def AES_stream_cipher(key):
+    return AES.new(key, AES.MODE_CTR, counter=xcounter(16))
+
+def Chacha20_stream_cipher(key):
+    b = blake2b(data=key)
+    new_key = b.digest()
+    return ChaCha20.new(key=new_key[8:40], nonce=new_key[0:8])
+
+class AES_Lioness:
+    def __init__(self, key, block_size):
+        self.cipher = AES_SHA256_Lioness(key, block_size)
+
+    def encrypt(self, block):
+        return self.cipher.encrypt(block)
+
+    def decrypt(self, block):
+        return self.cipher.decrypt(block)
+
+
+class Chacha_Lioness:
+    def __init__(self, key, block_size):
+        b = blake2b(data=key)
+        new_key = b.digest()
+        c = ChaCha20.new(key=new_key[8:40], nonce=key[:8])
+        lioness_key = c.encrypt(b'\x00' * 208)
+        self.cipher = Chacha20_Blake2b_Lioness(lioness_key, block_size)
+
+    def encrypt(self, block):
+        return self.cipher.encrypt(block)
+
+    def decrypt(self, block):
+        return self.cipher.decrypt(block)
+
+
 class SphinxParams:
     k = 16 # in bytes, == 128 bits
     m = 1024 # size of message body, in bytes
     clients = {} # mapping of destinations to clients
 
-    def __init__(self, r=5, group_class=None):
+    def __init__(self, r=5, group_class=None, lioness_class=None,
+                 lioness_key_len=None, stream_cipher=None):
         self.r = r
         assert group_class is not None
         self.group = group_class()
+        self.lioness_class = lioness_class
+        self.stream_cipher = stream_cipher
         self.nymserver = Nymserver(self)
+
+    def lioness_encrypt(self, key, data):
+        c = self.lioness_class(key, len(data))
+        return c.encrypt(data)
+
+    def lioness_decrypt(self, key, data):
+        c = self.lioness_class(key, len(data))
+        return c.decrypt(data)
 
     def xor(self, str1, str2):
         # XOR two strings
         assert len(str1) == len(str2)
-        return strxor(str1,str2)
-
-    class xcounter:
-        # Implements a string counter to do AES-CTR mode
-        i = 0
-        def __init__(self, size):
-            self.size = size
-
-        def __call__(self):
-            ii = number.long_to_bytes(self.i)
-            ii = '\x00' * (self.size-len(ii)) + ii
-            self.i += 1
-            return ii
-
-    # The LIONESS PRP
-
-    def lioness_enc(self, key, message):
-        assert len(key) == self.k
-        assert len(message) >= self.k * 2
-        # Round 1
-        r1 = self.xor(self.hash(message[self.k:]+key+'1')[:self.k],
-                        message[:self.k]) + message[self.k:]
-
-        # Round 2
-        k2 = self.xor(r1[:self.k], key)
-        c = AES.new(k2, AES.MODE_CTR, counter=self.xcounter(self.k))
-        r2 = r1[:self.k] + c.encrypt(r1[self.k:])
-
-        # Round 3
-        r3 = self.xor(self.hash(r2[self.k:]+key+'3')[:self.k], r2[:self.k]) + r2[self.k:]
-
-        # Round 4
-        k4 = self.xor(r3[:self.k], key)
-        c = AES.new(k4, AES.MODE_CTR, counter=self.xcounter(self.k))
-        r4 = r3[:self.k] + c.encrypt(r3[self.k:])
-
-        return r4
-
-    def lioness_dec(self, key, message):
-        assert len(key) == self.k
-        assert len(message) >= self.k * 2
-
-        r4 = message
-
-        # Round 4
-        k4 = self.xor(r4[:self.k], key)
-        c = AES.new(k4, AES.MODE_CTR, counter=self.xcounter(self.k))
-        r3 = r4[:self.k] + c.encrypt(r4[self.k:])
-
-        # Round 3
-        r2 = self.xor(self.hash(r3[self.k:]+key+'3')[:self.k], r3[:self.k]) + r3[self.k:]
-
-        # Round 2
-        k2 = self.xor(r2[:self.k], key)
-        c = AES.new(k2, AES.MODE_CTR, counter=self.xcounter(self.k))
-        r1 = r2[:self.k] + c.encrypt(r2[self.k:])
-
-        # Round 1
-        r0 = self.xor(self.hash(r1[self.k:]+key+'1')[:self.k], r1[:self.k]) + r1[self.k:]
-
-        return r0
+        return strxor(str1, str2)
 
     # The PRG; key is of length k, output is of length (2r+3)k
     def rho(self, key):
         assert len(key) == self.k
-        c = AES.new(key, AES.MODE_CTR, counter=self.xcounter(self.k))
+        c = self.stream_cipher(key)
         return c.encrypt("\x00" * ( (2 * self.r + 3) * self.k ))
 
     # The HMAC; key is of length k, output is of length k
@@ -204,17 +205,14 @@ class SphinxParams:
     def pi(self, key, data):
         assert len(key) == self.k
         assert len(data) == self.m
-
-        return self.lioness_enc(key, data)
+        return self.lioness_encrypt(key, data)
 
     # The inverse PRP; key is of length k, data is of length m
     def pii(self, key, data):
         assert len(key) == self.k
         assert len(data) == self.m
 
-        return self.lioness_dec(key, data)
-
-    # The various hashes
+        return self.lioness_decrypt(key, data)
 
     def hash(self, data):
         h = SHA256.new()
