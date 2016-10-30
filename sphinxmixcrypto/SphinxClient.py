@@ -118,7 +118,7 @@ class SphinxClient:
 
         id, keytuple, nymtuple = create_surb(self.params, route, node_map, self.id)
         self.keytable[id] = keytuple
-        self.params.nymserver.add_surb(nym, nymtuple)
+        return nymtuple
 
     def process(self, id, delta):
         """

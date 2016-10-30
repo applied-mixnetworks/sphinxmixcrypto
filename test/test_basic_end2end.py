@@ -58,7 +58,9 @@ class TestSphinxECCGroup(unittest.TestCase):
         # Create a reply block for the client
 
         reply_route = rand_subset(self.node_map.keys(), self.r)
-        self.client.create_nym("cypherpunk", reply_route, self.node_map)
+        nym = "cypherpunk"
+        nym_tuple = self.client.create_nym(nym, reply_route, self.node_map)
+        self.params.nymserver.add_surb(nym, nym_tuple)
         # Send a message to it
         reply_message = "this is a reply"
         nym_id = "cypherpunk"
