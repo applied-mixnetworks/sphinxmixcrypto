@@ -150,7 +150,7 @@ def AES_stream_cipher(key):
             self.i = 0
             self.size = size
         def __call__(self):
-            if self.i > self.size:
+            if self.i > 2**self.size:
                 raise Exception("AES_stream_cipher counter exhausted.")
             ii = number.long_to_bytes(self.i)
             ii = '\x00' * (self.size-len(ii)) + ii
