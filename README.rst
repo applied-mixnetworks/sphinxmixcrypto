@@ -2,9 +2,14 @@
 sphinxmixcrypto
 ---------------
 
-sphinxmixcrypto is a python library for writing mixnets.
+sphinxmixcrypto is a python crpyto library for writing mixnets.
 The code was forked from Ian Goldberg's reference implementation
 of Sphinx from 2011.
+
+Read the Sphinx paper:
+
+**Sphinx: A Compact and Provably Secure Mix Format**
+http://www0.cs.ucl.ac.uk/staff/G.Danezis/papers/sphinx-eprint.pdf
 
 This library intentionally does not have any networking code.
 It is a crypto library. You can look at the unit tests to see
@@ -21,9 +26,9 @@ using Chacha20 + Blake2.
 install
 -------
 
-You should probably install into a python virtual env.
+You should install into a python virtual env.
 
-I've replace the LIONESS implementation with my own:
+I've replaced the LIONESS implementation with my own:
 https://github.com/david415/pylioness
 
 You can install it like this::
