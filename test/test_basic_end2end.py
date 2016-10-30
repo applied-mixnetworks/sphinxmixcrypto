@@ -7,7 +7,7 @@ from sphinxmixcrypto.SphinxClient import SphinxClient, rand_subset, create_forwa
 
 
 
-class TestECCGroup(unittest.TestCase):
+class TestSphinxECCGroup(unittest.TestCase):
 
     def setUp(self):
         self.r = 5
@@ -15,42 +15,38 @@ class TestECCGroup(unittest.TestCase):
         #  Note that we could set group_class to Group_p like so:
         #  self.params = SphinxParams(self.r, group_class = Group_p)
 
+        self.node_map = {}
         # Create some nodes
         for i in xrange(2*self.r):
-            SphinxNode(self.params)
+            node = SphinxNode(self.params)
+            self.node_map[node.get_id()] = node
+
         # Create a client
         self.client = SphinxClient(self.params)
         # Pick a list of nodes to use
-        self.nodes = rand_subset(self.params.pki.keys(), self.r)
+        self.route = rand_subset(self.node_map.keys(), self.r)
 
-    def test_eccgroup_sphinx(self):
+    def test_end_to_end(self):
         message = "this is a test"
-        header, delta = create_forward_message(self.params, self.nodes, "dest", message)
+        header, delta = create_forward_message(self.params, self.route, self.node_map, "dest", message)
         # Send it to the first node for processing
 
-
         def send_to_client(client_id, message_id, delta):
-            print "send_to_client"
             return self.params.clients[client_id].process(message_id, delta)
 
         def send_to_mix(destination, header, payload):
-            print "send_to_mix"
-            #print "next hop is %s" % (self.params.pki[destination].name,)
-            return self.params.pki[destination].process(header, payload)
+            return self.node_map[destination].process(header, payload)
 
-        result = self.params.pki[self.nodes[0]].process(header, delta)
+        result = self.node_map[self.route[0]].process(header, delta)
         def mixnet_test_state_machine(result):
             while True:
                 self.failIf(result.has_error())
                 if result.tuple_next_hop:
-                    print "next hop"
                     result = send_to_mix(result.tuple_next_hop[0], result.tuple_next_hop[1], result.tuple_next_hop[2])
                 elif result.tuple_exit_hop:
-                    print "exit hop"
                     print "Deliver [%s] to [%s]" % (result.tuple_exit_hop[1], result.tuple_exit_hop[0])
                     break
                 elif result.tuple_client_hop:
-                    print "client hop"
                     result = send_to_client(*result.tuple_client_hop)
                     self.failIf(result.has_error())
                     print "[%s] received by [%s]" % (result.tuple_message[1], result.tuple_message[0])
@@ -58,9 +54,11 @@ class TestECCGroup(unittest.TestCase):
 
         mixnet_test_state_machine(result)
 
-        self.failUnlessEqual(self.params.pki[self.nodes[-1]].received[0], message)
+        self.failUnlessEqual(self.node_map[self.route[-1]].received[0], message)
         # Create a reply block for the client
-        self.client.create_nym("cypherpunk", self.r)
+
+        reply_route = rand_subset(self.node_map.keys(), self.r)
+        self.client.create_nym("cypherpunk", reply_route, self.node_map)
         # Send a message to it
         reply_message = "this is a reply"
         nym_id = "cypherpunk"

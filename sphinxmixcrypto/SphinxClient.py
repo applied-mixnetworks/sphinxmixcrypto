@@ -21,99 +21,77 @@ import os
 from SphinxNode import destination_encode, DSPEC, pad_body, unpad_body
 
 def rand_subset(lst, nu):
-    """Return a list of nu random elements of the given list (without
-    replacement)."""
-
+    """
+    Return a list of nu random elements of the given list (without
+    replacement).
+    """
     # Randomize the order of the list by sorting on a random key
     nodeids = [(os.urandom(8),x) for x in lst]
     nodeids.sort(key=lambda x:x[0])
-
     # Return the first nu elements of the randomized list
     return map(lambda x:x[1], nodeids[:nu])
 
-
-def create_header(params, nodelist, dest, id):
+def create_header(params, route, node_map, dest, id):
     p = params
-    pki = p.pki
-    nu = len(nodelist)
-    assert nu <= p.r
+    route_len = len(route)
+    assert route_len <= p.r
     assert len(id) == p.k
-    assert len(dest) <= 2 * (p.r - nu + 1) * p.k
+    assert len(dest) <= 2 * (p.r - route_len + 1) * p.k
     group = p.group
     x = group.gensecret()
-
     # Compute the (alpha, s, b) tuples
     blinds = [x]
     asbtuples = []
-    for node in nodelist:
+    for node in route:
         alpha = group.multiexpon(group.g, blinds)
-        s = group.multiexpon(pki[node].y, blinds)
+        s = group.multiexpon(node_map[node].y, blinds)
         b = p.hb(alpha,s)
         blinds.append(b)
         asbtuples.append({ 'alpha': alpha, 's': s, 'b': b})
-
     # Compute the filler strings
     phi = ''
-    for i in xrange(1,nu):
+    for i in xrange(1,route_len):
         min = (2*(p.r-i)+3)*p.k
         phi = p.xor(phi + ("\x00" * (2*p.k)),
             p.rho(p.hrho(asbtuples[i-1]['s']))[min:])
-        # print i,phi.encode("hex")
-
     # Compute the (beta, gamma) tuples
-    # The os.urandom used to be a string of 0x00 bytes, but that's wrong
-    beta = dest + id + os.urandom(((2 * (p.r - nu) + 2)*p.k - len(dest)))
+    beta = dest + id + os.urandom(((2 * (p.r - route_len) + 2)*p.k - len(dest)))
     beta = p.xor(beta,
-        p.rho(p.hrho(asbtuples[nu-1]['s']))[:(2*(p.r-nu)+3)*p.k]) + phi
-    gamma = p.mu(p.hmu(asbtuples[nu-1]['s']), beta)
-    # print "s =", group.printable(asbtuples[i]['s'])
-    # print "beta = ", beta.encode("hex")
-    # print "gamma = ", gamma.encode("hex")
-    for i in xrange(nu-2, -1, -1):
-        id = nodelist[i+1]
+        p.rho(p.hrho(asbtuples[route_len-1]['s']))[:(2*(p.r-route_len)+3)*p.k]) + phi
+    gamma = p.mu(p.hmu(asbtuples[route_len-1]['s']), beta)
+    for i in xrange(route_len-2, -1, -1):
+        id = route[i+1]
         assert len(id) == p.k
         beta = p.xor(id + gamma + beta[:(2*p.r-1)*p.k],
             p.rho(p.hrho(asbtuples[i]['s']))[:(2*p.r+1)*p.k])
         gamma = p.mu(p.hmu(asbtuples[i]['s']), beta)
-        # print pki[id].name
-        # print "s =", group.printable(asbtuples[i]['s'])
-        # print "beta = ", beta.encode("hex")
-        # print "gamma = ", gamma.encode("hex")
+    return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
 
-    return (asbtuples[0]['alpha'], beta, gamma), \
-        [y['s'] for y in asbtuples]
-
-
-def create_forward_message(params, nodelist, dest, msg):
+def create_forward_message(params, route, node_map, dest, msg):
     p = params
-    nu = len(nodelist)
+    route_len = len(route)
     assert len(dest) < 128 and len(dest) > 0
     assert p.k + 1 + len(dest) + len(msg) < p.m
-
     # Compute the header and the secrets
-    header, secrets = create_header(params, nodelist, DSPEC,
-        "\x00" * p.k)
-
+    header, secrets = create_header(params, route, node_map, DSPEC, "\x00" * p.k)
     body = pad_body(p.m, ("\x00" * p.k) + destination_encode(dest) + msg)
-
     # Compute the delta values
-    delta = p.pi(p.hpi(secrets[nu-1]), body)
-    for i in xrange(nu-2, -1, -1):
+    delta = p.pi(p.hpi(secrets[route_len-1]), body)
+    for i in xrange(route_len-2, -1, -1):
         delta = p.pi(p.hpi(secrets[i]), delta)
-
     return header, delta
 
-def create_surb(params, nodelist, dest):
+def create_surb(params, route, node_map, dest):
     p = params
     id = os.urandom(p.k)
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, nodelist, destination_encode(dest), id)
+    header, secrets = create_header(params, route, node_map, destination_encode(dest), id)
 
     ktilde = os.urandom(p.k)
     keytuple = [ktilde]
     keytuple.extend(map(p.hpi, secrets))
-    return id, keytuple, (nodelist[0], header, ktilde)
+    return id, keytuple, (route[0], header, ktilde)
 
 
 class ClientMessage:
@@ -134,14 +112,11 @@ class SphinxClient:
         params.clients[self.id] = self
         self.keytable = {}
 
-    def create_nym(self, nym, nllength):
+    def create_nym(self, nym, route, node_map):
         """Create a SURB for the given nym (passing through nllength
         nodes), and send it to the nymserver."""
 
-        # Pick the list of nodes to use
-        nodelist = rand_subset(self.params.pki.keys(), nllength)
-        id, keytuple, nymtuple = create_surb(self.params, nodelist, self.id)
-
+        id, keytuple, nymtuple = create_surb(self.params, route, node_map, self.id)
         self.keytable[id] = keytuple
         self.params.nymserver.add_surb(nym, nymtuple)
 
@@ -158,8 +133,8 @@ class SphinxClient:
             return message
 
         ktilde = keytuple.pop(0)
-        nu = len(keytuple)
-        for i in xrange(nu-1, -1, -1):
+        route_len = len(keytuple)
+        for i in xrange(route_len-1, -1, -1):
             delta = p.pi(keytuple[i], delta)
         delta = p.pii(ktilde, delta)
 

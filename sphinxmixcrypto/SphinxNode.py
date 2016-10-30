@@ -88,7 +88,9 @@ class SphinxNode:
         self.id = self.__Nenc(idnum)
         self.name = "Node " + idnum.encode("hex")
         self.seen = {}
-        params.pki[self.id] = self
+
+    def get_id(self):
+        return self.id
 
     def __Nenc(self, idnum):
         id = "\xff" + idnum + ("\x00" * (self.p.k - len(idnum) - 1))
@@ -112,7 +114,6 @@ class SphinxNode:
         """
         result = MessageResult()
         p = self.p
-        pki = p.pki
         group = p.group
         alpha, beta, gamma = header
 

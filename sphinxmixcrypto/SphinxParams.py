@@ -116,7 +116,6 @@ class Group_ECC:
 class SphinxParams:
     k = 16 # in bytes, == 128 bits
     m = 1024 # size of message body, in bytes
-    pki = {} # mapping of node id to node
     clients = {} # mapping of destinations to clients
 
     def __init__(self, r=5, group_class=None):

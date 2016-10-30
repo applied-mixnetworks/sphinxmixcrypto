@@ -44,7 +44,6 @@ class Nymserver:
     def process(self, nym, message):
         result = NymResult()
         p = self.params
-        pki = p.pki
         db = self.database
         if nym in db and len(db[nym]) > 0:
             n0, header0, ktilde = db[nym].pop(0)
