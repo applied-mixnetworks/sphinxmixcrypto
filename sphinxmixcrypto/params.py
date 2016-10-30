@@ -19,8 +19,8 @@
 #
 
 """
-This module is used to parameterize the crypto primitive are used in
-mixnet packets.
+This module is used to parameterize the crypto primitives
+used to encrypt/decrypt sphinx mixnet packets.
 """
 
 import os
@@ -35,7 +35,7 @@ from Cryptodome.Cipher import ChaCha20
 
 from pylioness import Chacha20_Blake2b_Lioness, AES_SHA256_Lioness
 
-from sphinxmixcrypto.SphinxNymserver import Nymserver
+from sphinxmixcrypto.nym_server import Nymserver
 
 
 class GroupP:
@@ -86,7 +86,7 @@ class GroupP:
 
 
 class GroupECC:
-    "Group operations in ECC"
+    "Group operations in curve25519"
 
     def __init__(self):
 

@@ -18,7 +18,7 @@
 # <http://www.gnu.org/licenses/>.
 
 import os
-from SphinxNode import destination_encode, DSPEC, pad_body, unpad_body
+from node import destination_encode, DSPEC, pad_body, unpad_body
 
 def rand_subset(lst, nu):
     """

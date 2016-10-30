@@ -9,10 +9,10 @@ from __future__ import unicode_literals
 from __future__ import with_statement
 
 
-from sphinxmixcrypto.SphinxClient import SphinxClient, create_forward_message, rand_subset
-from sphinxmixcrypto.SphinxNode import SphinxNode
-from sphinxmixcrypto.SphinxParams import SphinxParams
-from sphinxmixcrypto.SphinxNymserver import Nymserver
+from sphinxmixcrypto.client import SphinxClient, create_forward_message, rand_subset
+from sphinxmixcrypto.node import SphinxNode
+from sphinxmixcrypto.params import SphinxParams
+from sphinxmixcrypto.nym_server import Nymserver
 
 __all__ = [
     "SphinxNode",
