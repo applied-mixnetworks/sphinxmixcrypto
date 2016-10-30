@@ -128,6 +128,15 @@ class xcounter:
         self.i += 1
         return ii
 
+def SHA256_hash(data):
+    h = SHA256.new()
+    h.update(data)
+    return h.digest()
+
+def Blake2_hash(data):
+    b = blake2b(data=data)
+    h = b.digest()
+    return h[:32]
 
 def AES_stream_cipher(key):
     return AES.new(key, AES.MODE_CTR, counter=xcounter(16))
@@ -167,11 +176,12 @@ class SphinxParams:
     clients = {} # mapping of destinations to clients
 
     def __init__(self, r=5, group_class=None, lioness_class=None,
-                 lioness_key_len=None, stream_cipher=None):
+                 hash_func=None, stream_cipher=None):
         self.r = r
         assert group_class is not None
         self.group = group_class()
         self.lioness_class = lioness_class
+        self.hash_func = hash_func
         self.stream_cipher = stream_cipher
         self.nymserver = Nymserver(self)
 
@@ -212,33 +222,28 @@ class SphinxParams:
 
         return self.lioness_decrypt(key, data)
 
-    def hash(self, data):
-        h = SHA256.new()
-        h.update(data)
-        return h.digest()
-
     def hb(self, alpha, s):
         "Compute a hash of alpha and s to use as a blinding factor"
         group = self.group
-        return group.makeexp(self.hash("hb:" + group.printable(alpha)
+        return group.makeexp(self.hash_func("hb:" + group.printable(alpha)
             + " , " + group.printable(s)))
 
     def hrho(self, s):
         "Compute a hash of s to use as a key for the PRG rho"
         group = self.group
-        return (self.hash("hrho:" + group.printable(s)))[:self.k]
+        return (self.hash_func("hrho:" + group.printable(s)))[:self.k]
 
     def hmu(self, s):
         "Compute a hash of s to use as a key for the HMAC mu"
         group = self.group
-        return (self.hash("hmu:" + group.printable(s)))[:self.k]
+        return (self.hash_func("hmu:" + group.printable(s)))[:self.k]
 
     def hpi(self, s):
         "Compute a hash of s to use as a key for the PRP pi"
         group = self.group
-        return (self.hash("hpi:" + group.printable(s)))[:self.k]
+        return (self.hash_func("hpi:" + group.printable(s)))[:self.k]
 
     def htau(self, s):
         "Compute a hash of s to use to see if we've seen s before"
         group = self.group
-        return (self.hash("htau:" + group.printable(s)))
+        return (self.hash_func("htau:" + group.printable(s)))

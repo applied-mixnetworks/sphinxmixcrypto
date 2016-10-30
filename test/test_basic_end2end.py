@@ -1,7 +1,7 @@
 
 import unittest
 
-from sphinxmixcrypto.SphinxParams import SphinxParams, Group_p, Group_ECC, Chacha_Lioness, Chacha20_stream_cipher
+from sphinxmixcrypto.SphinxParams import SphinxParams, Group_p, Group_ECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash
 from sphinxmixcrypto.SphinxNode import SphinxNode, MessageResult
 from sphinxmixcrypto.SphinxClient import SphinxClient, rand_subset, create_forward_message
 
@@ -12,6 +12,7 @@ class TestSphinxECCGroup(unittest.TestCase):
         self.r = 5
         self.params = SphinxParams(
             self.r, group_class = Group_ECC,
+            hash_func = Blake2_hash,
             lioness_class = Chacha_Lioness,
             stream_cipher = Chacha20_stream_cipher,
         )
