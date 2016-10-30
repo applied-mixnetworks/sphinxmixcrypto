@@ -150,9 +150,7 @@ class AES_Lioness:
 
 class Chacha_Lioness:
     def __init__(self, key, block_size):
-        b = blake2b(data=key)
-        new_key = b.digest()
-        c = ChaCha20.new(key=new_key[8:40], nonce=new_key[:8])
+        c = Chacha20_stream_cipher(key)
         lioness_key = c.encrypt(b'\x00' * 208)
         self.cipher = Chacha20_Blake2b_Lioness(lioness_key, block_size)
 
