@@ -2,7 +2,7 @@
 import unittest
 
 from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash
-from sphinxmixcrypto.node import SphinxNode
+from sphinxmixcrypto import SphinxNode
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 
 
