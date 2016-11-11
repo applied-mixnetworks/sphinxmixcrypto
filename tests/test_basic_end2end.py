@@ -46,12 +46,12 @@ class TestSphinxECCGroup(unittest.TestCase):
                 if result.tuple_next_hop:
                     result = send_to_mix(result.tuple_next_hop[0], result.tuple_next_hop[1], result.tuple_next_hop[2])
                 elif result.tuple_exit_hop:
-                    print "Deliver [%s] to [%s]" % (result.tuple_exit_hop[1], result.tuple_exit_hop[0])
+                    print("Deliver [%s] to [%s]" % (result.tuple_exit_hop[1], result.tuple_exit_hop[0]))
                     break
                 elif result.tuple_client_hop:
                     result = send_to_client(*result.tuple_client_hop)
                     self.failIf(result.has_error())
-                    print "[%s] received by [%s]" % (result.tuple_message[1], result.tuple_message[0])
+                    print("[%s] received by [%s]" % (result.tuple_message[1], result.tuple_message[0]))
                     break
 
         mixnet_test_state_machine(result)
@@ -67,12 +67,12 @@ class TestSphinxECCGroup(unittest.TestCase):
         reply_message = "this is a reply"
         nym_id = "cypherpunk"
 
-        print "Nymserver received message for [%s]" % nym_id
+        print("Nymserver received message for [%s]" % nym_id)
         nym_result = self.params.nymserver.process(nym_id, reply_message)
 
-        print "Nymserver received message for [%s]" % nym_id
+        print("Nymserver received message for [%s]" % nym_id)
         if nym_result.has_error():
-            print "No SURBs available for nym [%s]" % nym_id
+            print("No SURBs available for nym [%s]" % nym_id)
         self.failIf(nym_result.has_error())
 
         mixnet_test_state_machine(nym_result.message_result)

@@ -7,7 +7,7 @@ from setuptools import setup
 
 
 description = '''
-    Sphinx mixnet
+    Sphinx mixnet crypto
 '''
 
 setup(
@@ -20,9 +20,5 @@ setup(
     classifiers=[
         'Topic :: Security',
     ],
-    #author=__author__,
-    #author_email=__contact__,
-    #url=__url__,
-    #license=__license__,
     packages=["sphinxmixcrypto"],
 )
