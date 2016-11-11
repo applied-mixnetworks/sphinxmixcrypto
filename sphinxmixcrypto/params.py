@@ -50,10 +50,10 @@ class GroupP:
         517706067943361819659545828482653492891104587913554024076544568803664876176841762410041 + \
         643804280840775935598361131923601799147307296410539233589716020166265519420170231237267 + \
         848121356044355838177752128425942891191400809793668864920967000989279066999182347251553 + \
-        7714171774700422727L
+        7714171774700422727
 
         # A 256-bit prime.  q | p-1, and (p-1)/(2q) is also prime
-        self.__q = 106732665057690615308701680462846682779480968671143352109289849544853387479559L
+        self.__q = 106732665057690615308701680462846682779480968671143352109289849544853387479559
 
         # A generator of the 256-bit subgroup of order q
         self.generator = 484139441786349441222753937359181507222186847483440700310896462165694808760753 + \
@@ -63,7 +63,7 @@ class GroupP:
                  312260922194735482986906987547422160345740734733202920357368017078519121268583 + \
                  377382750037104414214664818336930092771460011453820969206987379419171538261727 + \
                  876814959465431589529648553329257486681938507314187048365957770789256545184218 + \
-                 1763727355979252885729688362656338077037492411991956527093735651034592L
+                 1763727355979252885729688362656338077037492411991956527093735651034592
 
     def gensecret(self):
         return number.bytes_to_long(os.urandom(256)) % self.__q
@@ -93,11 +93,11 @@ class GroupECC:
         self.generator = self.basepoint()
 
     def basepoint(self):
-        curve_bytes = []
-        curve_bytes.append(b'\x09')
+        curve_bytes = b''
+        curve_bytes += b'\x09'
         for i in range(1, 32):
-            curve_bytes.append(b'\x00')
-        return str(bytearray(curve_bytes))
+            curve_bytes += b'\x00'
+        return curve_bytes
 
     def makesecret(self, exp):
         """
@@ -106,17 +106,21 @@ class GroupECC:
         """
         curve_out = []
         for c in exp:
-            curve_out.append(ord(c))
+            if isinstance(c, int):
+                curve_out.append(c)
+            else:
+                curve_out.append(ord(c))
         curve_out[0] &= 248
         curve_out[31] &= 127
         curve_out[31] |= 64
-        return str(bytearray(curve_out))
+        return bytes(bytearray(curve_out))
 
     def gensecret(self):
         return self.makesecret(os.urandom(32))
 
     def expon(self, base, exp):
-        return crypto_scalarmult(exp, base)
+        # XXX make me python3 compatible
+        return crypto_scalarmult(bytes(exp), bytes(base))
 
     def multiexpon(self, base, exps):
         baseandexps = [base]

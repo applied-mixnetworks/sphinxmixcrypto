@@ -23,6 +23,7 @@ This SphinxNode module includes cryptographic algorithms for mix net nodes
 
 import os
 import re
+import binascii
 
 # Padding/unpadding of message bodies: a 0 bit, followed by as many 1
 # bits as it takes to fill it up
@@ -73,7 +74,7 @@ class MessageResult:
         for err in filter(lambda x: x.startswith('error'), dir(self)):
             if getattr(self, err):
                 #raise Exception("err %s is %s" % (err, getattr(self, err)))
-                print "err %s is %s" % (err, getattr(self, err))
+                print("err %s is %s" % (err, getattr(self, err)))  # XXX
                 return True
         return False
 
@@ -86,23 +87,23 @@ class SphinxNode:
         self.y = group.expon(group.generator, self.__x)
         idnum = os.urandom(4)
         self.id = self.__Nenc(idnum)
-        self.name = "Node " + idnum.encode("hex")
+        self.name = "Node " + str(binascii.b2a_hex(idnum))
         self.seen = {}
 
     def get_id(self):
         return self.id
 
     def __Nenc(self, idnum):
-        id = "\xff" + idnum + ("\x00" * (self.p.k - len(idnum) - 1))
+        id = b"\xff" + idnum + (b"\x00" * (self.p.k - len(idnum) - 1))
         assert len(id) == self.p.k
         return id
 
     # Decode the prefix-free encoding.  Return the type, value, and the
     # remainder of the input string
     def __PFdecode(self, s):
-        if s == "": return None, None, None
-        if s[0] == '\x00': return 'Dspec', None, s[1:]
-        if s[0] == '\xff': return 'node', s[:self.p.k], s[self.p.k:]
+        if s == b"": return None, None, None
+        if s[0] == b'\x00': return 'Dspec', None, s[1:]
+        if s[0] == b'\xff': return 'node', s[:self.p.k], s[self.p.k:]
         l = ord(s[0])
         if l < 128: return 'dest', s[1:l+1], s[l+1:]
         return None, None, None
@@ -131,7 +132,7 @@ class SphinxNode:
             return result
 
         self.seen[tag] = 1
-        B = p.xor(beta + ("\x00" * (2 * p.k)), p.rho(p.hrho(s)))
+        B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
         type, val, rest = self.__PFdecode(B)
 
         if type == "node":
@@ -144,7 +145,7 @@ class SphinxNode:
             return result
         elif type == "Dspec":
             payload = p.pii(p.hpi(s), payload)
-            if payload[:p.k] == ("\x00" * p.k):
+            if payload[:p.k] == (b"\x00" * p.k):
                 type, val, rest = self.__PFdecode(payload[p.k:])
                 if type == "dest":
                     # We're to deliver rest (unpadded) to val

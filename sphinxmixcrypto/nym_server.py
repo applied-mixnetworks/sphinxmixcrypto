@@ -17,7 +17,7 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-from node import pad_body, MessageResult
+from sphinxmixcrypto.node import pad_body, MessageResult
 
 class NymResult:
     def __init__(self):

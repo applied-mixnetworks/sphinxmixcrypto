@@ -18,7 +18,8 @@
 # <http://www.gnu.org/licenses/>.
 
 import os
-from node import destination_encode, DSPEC, pad_body, unpad_body
+import binascii
+from sphinxmixcrypto.node import destination_encode, DSPEC, pad_body, unpad_body
 
 def rand_subset(lst, nu):
     """
@@ -52,7 +53,7 @@ def create_header(params, route, node_map, dest, id):
     phi = ''
     for i in xrange(1,route_len):
         min = (2*(p.r-i)+3)*p.k
-        phi = p.xor(phi + ("\x00" * (2*p.k)),
+        phi = p.xor(phi + (b"\x00" * (2*p.k)),
             p.rho(p.hrho(asbtuples[i-1]['s']))[min:])
     # Compute the (beta, gamma) tuples
     beta = dest + id + os.urandom(((2 * (p.r - route_len) + 2)*p.k - len(dest)))
@@ -69,12 +70,12 @@ def create_header(params, route, node_map, dest, id):
 
 def create_forward_message(params, route, node_map, dest, msg):
     p = params
-    route_len = len(route)
+    route_len = len(route.keys())
     assert len(dest) < 128 and len(dest) > 0
     assert p.k + 1 + len(dest) + len(msg) < p.m
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, node_map, DSPEC, "\x00" * p.k)
-    body = pad_body(p.m, ("\x00" * p.k) + destination_encode(dest) + msg)
+    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * p.k)
+    body = pad_body(p.m, (b"\x00" * p.k) + destination_encode(dest) + msg)
     # Compute the delta values
     delta = p.pi(p.hpi(secrets[route_len-1]), body)
     for i in xrange(route_len-2, -1, -1):
@@ -107,7 +108,7 @@ class ClientMessage:
 
 class SphinxClient:
     def __init__(self, params):
-        self.id = "Client " + os.urandom(4).encode("hex")
+        self.id = "Client " + str(binascii.hexlify(os.urandom(4)))
         self.params = params
         params.clients[self.id] = self
         self.keytable = {}
@@ -138,7 +139,7 @@ class SphinxClient:
             delta = p.pi(keytuple[i], delta)
         delta = p.pii(ktilde, delta)
 
-        if delta[:p.k] == ("\x00" * p.k):
+        if delta[:p.k] == (b"\x00" * p.k):
             msg = unpad_body(delta[p.k:])
             message.tuple_message = (self.id, msg)
             return message

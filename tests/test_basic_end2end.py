@@ -19,7 +19,7 @@ class TestSphinxECCGroup(unittest.TestCase):
 
         self.node_map = {}
         # Create some nodes
-        for i in xrange(2*self.r):
+        for i in range(2*self.r):
             node = SphinxNode(self.params)
             self.node_map[node.get_id()] = node
 
