@@ -1,3 +1,14 @@
+README
+======
+
+.. image:: https://travis-ci.org/david415/sphinxmixcrypto.png?branch=master
+    :target: https://www.travis-ci.org/david415/sphinxmixcrypto/
+    :alt: travis
+
+.. image:: https://coveralls.io/repos/github/david415/sphinxmixcrypto/badge.svg?branch=master
+    :alt: coveralls
+
+
 
 sphinxmixcrypto
 ---------------
