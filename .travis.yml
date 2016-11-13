@@ -8,7 +8,6 @@ env:
     - TOX_ENV=py27
     - TOX_ENV=py35
 
-
 script:
   - tox -c tox.ini -e $TOX_ENV
 

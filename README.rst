@@ -5,7 +5,8 @@ README
     :target: https://www.travis-ci.org/david415/sphinxmixcrypto/
     :alt: travis
 
-.. image:: https://coveralls.io/repos/github/david415/sphinxmixcrypto/badge.svg?branch=master
+.. image:: https://coveralls.io/repos/github/david415/sphinxmixcrypto/badge.svg
+    :target: https://coveralls.io/github/david415/sphinxmixcrypto
     :alt: coveralls
 
 

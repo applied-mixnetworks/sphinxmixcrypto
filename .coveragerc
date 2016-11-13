@@ -1,0 +1,11 @@
+[report]
+omit =
+ */python?.?/*
+ *__init__*
+
+[paths]
+source =
+    sphinxmixcrypto
+
+[run]
+source = ./sphinxmixcrypto
