@@ -30,7 +30,7 @@ def rand_subset(lst, nu):
     nodeids = [(os.urandom(8),x) for x in lst]
     nodeids.sort(key=lambda x:x[0])
     # Return the first nu elements of the randomized list
-    return map(lambda x:x[1], nodeids[:nu])
+    return [x[1] for x in nodeids[:nu]]
 
 def create_header(params, route, node_map, dest, id):
     p = params
@@ -46,12 +46,12 @@ def create_header(params, route, node_map, dest, id):
     for node in route:
         alpha = group.multiexpon(group.generator, blinds)
         s = group.multiexpon(node_map[node].y, blinds)
-        b = p.hb(alpha,s)
+        b = p.hb(alpha, s)
         blinds.append(b)
-        asbtuples.append({ 'alpha': alpha, 's': s, 'b': b})
+        asbtuples.append({'alpha': alpha, 's': s, 'b': b})
     # Compute the filler strings
-    phi = ''
-    for i in xrange(1,route_len):
+    phi = b''
+    for i in range(1,route_len):
         min = (2*(p.r-i)+3)*p.k
         phi = p.xor(phi + (b"\x00" * (2*p.k)),
             p.rho(p.hrho(asbtuples[i-1]['s']))[min:])
@@ -60,7 +60,7 @@ def create_header(params, route, node_map, dest, id):
     beta = p.xor(beta,
         p.rho(p.hrho(asbtuples[route_len-1]['s']))[:(2*(p.r-route_len)+3)*p.k]) + phi
     gamma = p.mu(p.hmu(asbtuples[route_len-1]['s']), beta)
-    for i in xrange(route_len-2, -1, -1):
+    for i in range(route_len-2, -1, -1):
         id = route[i+1]
         assert len(id) == p.k
         beta = p.xor(id + gamma + beta[:(2*p.r-1)*p.k],
@@ -70,15 +70,15 @@ def create_header(params, route, node_map, dest, id):
 
 def create_forward_message(params, route, node_map, dest, msg):
     p = params
-    route_len = len(route.keys())
+    route_len = len(route)
     assert len(dest) < 128 and len(dest) > 0
     assert p.k + 1 + len(dest) + len(msg) < p.m
     # Compute the header and the secrets
     header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * p.k)
-    body = pad_body(p.m, (b"\x00" * p.k) + destination_encode(dest) + msg)
+    body = pad_body(p.m, (b"\x00" * p.k) + bytes(destination_encode(dest)) + bytes(msg))
     # Compute the delta values
     delta = p.pi(p.hpi(secrets[route_len-1]), body)
-    for i in xrange(route_len-2, -1, -1):
+    for i in range(route_len-2, -1, -1):
         delta = p.pi(p.hpi(secrets[i]), delta)
     return header, delta
 
@@ -91,7 +91,7 @@ def create_surb(params, route, node_map, dest):
 
     ktilde = os.urandom(p.k)
     keytuple = [ktilde]
-    keytuple.extend(map(p.hpi, secrets))
+    keytuple.extend([p.hpi(x) for x in secrets])
     return id, keytuple, (route[0], header, ktilde)
 
 
@@ -108,7 +108,7 @@ class ClientMessage:
 
 class SphinxClient:
     def __init__(self, params):
-        self.id = "Client " + str(binascii.hexlify(os.urandom(4)))
+        self.id = b"Client " + bytes(str(binascii.hexlify(os.urandom(4))).encode("utf-8"))
         self.params = params
         params.clients[self.id] = self
         self.keytable = {}
@@ -135,7 +135,7 @@ class SphinxClient:
 
         ktilde = keytuple.pop(0)
         route_len = len(keytuple)
-        for i in xrange(route_len-1, -1, -1):
+        for i in range(route_len-1, -1, -1):
             delta = p.pi(keytuple[i], delta)
         delta = p.pii(ktilde, delta)
 

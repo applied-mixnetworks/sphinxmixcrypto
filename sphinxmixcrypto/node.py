@@ -25,8 +25,9 @@ import os
 import re
 import binascii
 
-# Padding/unpadding of message bodies: a 0 bit, followed by as many 1
-# bits as it takes to fill it up
+# The special destination
+DSPEC = b"\x00"
+
 
 def pad_body(msgtotalsize, body):
     """
@@ -34,28 +35,24 @@ def pad_body(msgtotalsize, body):
     Given the total size and the message data a new
     padded message is returned.
     """
-    body = body + "\x7f"
-    body = body + ("\xff" * (msgtotalsize - len(body)))
+    body = bytes(body) + b"\x7f"
+    body = body + (b"\xff" * (msgtotalsize - len(body)))
     return body
+
 
 def unpad_body(body):
     """
     unpad_body performs the inverse of pad_body
     """
-    return re.compile("\x7f\xff*$").sub('', body)
+    return re.compile(b"\x7f\xff*$").sub(b"", body)
 
-# Prefix-free encoding/decoding of node names and destinations
 
-# The special destination
-DSPEC = "\x00"
-
-# Any other destination.  Must be between 1 and 127 bytes in length
 def destination_encode(dest):
     """
     encode destination
     """
     assert len(dest) >= 1 and len(dest) <= 127
-    return chr(len(dest)) + dest
+    return b"%c" % len(dest) + dest
 
 
 class MessageResult:
@@ -70,13 +67,18 @@ class MessageResult:
         self.tuple_exit_hop = ()
         self.tuple_client_hop = ()
 
-    def has_error(self):
-        for err in filter(lambda x: x.startswith('error'), dir(self)):
+    def print_error(self):
+        for err in [x for x in dir(self) if x.startswith('error')]:
             if getattr(self, err):
-                #raise Exception("err %s is %s" % (err, getattr(self, err)))
-                print("err %s is %s" % (err, getattr(self, err)))  # XXX
+                print(("err %s is %s" % (err, getattr(self, err))))
+
+    def has_error(self):
+        for err in [x for x in dir(self) if x.startswith('error')]:
+            if getattr(self, err):
+                print(("err %s is %s" % (err, getattr(self, err))))  # XXX
                 return True
         return False
+
 
 class SphinxNode:
     def __init__(self, params):
@@ -100,14 +102,20 @@ class SphinxNode:
 
     # Decode the prefix-free encoding.  Return the type, value, and the
     # remainder of the input string
-    def __PFdecode(self, s):
-        if s == b"": return None, None, None
-        if s[0] == b'\x00': return 'Dspec', None, s[1:]
-        if s[0] == b'\xff': return 'node', s[:self.p.k], s[self.p.k:]
-        l = ord(s[0])
-        if l < 128: return 'dest', s[1:l+1], s[l+1:]
+    def _prefix_free_decode(self, s):
+        if len(s) == 0:
+            return None, None, None
+        if isinstance(s[0], int):
+            l = s[0]
+        else:
+            l = ord(s[0])
+        if l == 0:
+            return 'Dspec', None, s[1:]
+        if l == 255:
+            return 'node', s[:self.p.k], s[self.p.k:]
+        if l < 128:
+            return 'dest', s[1:l+1], s[l+1:]
         return None, None, None
-
 
     def process(self, header, payload):
         """
@@ -133,9 +141,8 @@ class SphinxNode:
 
         self.seen[tag] = 1
         B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
-        type, val, rest = self.__PFdecode(B)
-
-        if type == "node":
+        message_type, val, rest = self._prefix_free_decode(B)
+        if message_type == "node":
             b = p.hb(alpha, s)
             alpha = group.expon(alpha, b)
             gamma = B[p.k:p.k*2]
@@ -143,11 +150,11 @@ class SphinxNode:
             payload = p.pii(p.hpi(s), payload)
             result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
             return result
-        elif type == "Dspec":
+        elif message_type == "Dspec":
             payload = p.pii(p.hpi(s), payload)
             if payload[:p.k] == (b"\x00" * p.k):
-                type, val, rest = self.__PFdecode(payload[p.k:])
-                if type == "dest":
+                inner_type, val, rest = self._prefix_free_decode(payload[p.k:])
+                if inner_type == "dest":
                     # We're to deliver rest (unpadded) to val
                     body = unpad_body(rest)
                     self.received.append(body)
@@ -155,7 +162,7 @@ class SphinxNode:
                     return result
             result.error_invalid_dspec = True
             return result
-        elif type == "dest":
+        elif message_type == "dest":
             id = rest[:p.k]
             payload = p.pii(p.hpi(s), payload)
             if val in p.clients:

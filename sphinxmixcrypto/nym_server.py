@@ -47,7 +47,7 @@ class Nymserver:
         db = self.database
         if nym in db and len(db[nym]) > 0:
             n0, header0, ktilde = db[nym].pop(0)
-            body = p.pi(ktilde, pad_body(p.m, ("\x00" * p.k) + message))
+            body = p.pi(ktilde, pad_body(p.m, (b"\x00" * p.k) + message))
             message = MessageResult()
             message.tuple_next_hop = (n0, header0, body)
             result.message_result = message

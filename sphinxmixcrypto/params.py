@@ -24,6 +24,7 @@ used to encrypt/decrypt sphinx mixnet packets.
 """
 
 import os
+import binascii
 
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256, HMAC
@@ -36,6 +37,14 @@ from Cryptodome.Cipher import ChaCha20
 from pylioness import Chacha20_Blake2b_Lioness, AES_SHA256_Lioness
 
 from sphinxmixcrypto.nym_server import Nymserver
+from functools import reduce
+
+
+BLINDING_HASH_PREFIX = b'\0x11'
+RHO_HASH_PREFIX = b'\0x22'
+MU_HASH_PREFIX = b'\0x33'
+PI_HASH_PREFIX = b'\0x44'
+TAU_HASH_PREFIX = b'\0x55'
 
 
 class GroupP:
@@ -81,9 +90,6 @@ class GroupP:
         return alpha > 1 and alpha < (self.__p - 1) and \
             pow(alpha, self.__q, self.__p) == 1
 
-    def printable(self, alpha):
-        return str(alpha)
-
 
 class GroupECC:
     "Group operations in curve25519"
@@ -119,7 +125,6 @@ class GroupECC:
         return self.makesecret(os.urandom(32))
 
     def expon(self, base, exp):
-        # XXX make me python3 compatible
         return crypto_scalarmult(bytes(exp), bytes(base))
 
     def multiexpon(self, base, exps):
@@ -135,8 +140,6 @@ class GroupECC:
         # All strings of length 32 are in the group, says DJB
         return len(alpha) == 32
 
-    def printable(self, alpha):
-        return alpha.encode("hex")
 
 def SHA256_hash(data):
     h = SHA256.new()
@@ -144,7 +147,7 @@ def SHA256_hash(data):
     return h.digest()
 
 def Blake2_hash(data):
-    b = blake2b(data=data)
+    b = blake2b(data=bytes(data))
     h = b.digest()
     return h[:32]
 
@@ -157,7 +160,7 @@ def AES_stream_cipher(key):
             if self.i > 2**self.size:
                 raise Exception("AES_stream_cipher counter exhausted.")
             ii = number.long_to_bytes(self.i)
-            ii = '\x00' * (self.size-len(ii)) + ii
+            ii = b'\x00' * (self.size-len(ii)) + ii
             self.i += 1
             return ii
     return AES.new(key, AES.MODE_CTR, counter=xcounter(16))
@@ -217,13 +220,13 @@ class SphinxParams:
     def xor(self, str1, str2):
         # XOR two strings
         assert len(str1) == len(str2)
-        return strxor(str1, str2)
+        return bytes(strxor(str1, str2))
 
     # The PRG; key is of length k, output is of length (2r+3)k
     def rho(self, key):
         assert len(key) == self.k
         c = self.stream_cipher(key)
-        return c.encrypt("\x00" * ((2 * self.r + 3) * self.k))
+        return c.encrypt(b"\x00" * ((2 * self.r + 3) * self.k))
 
     # The HMAC; key is of length k, output is of length k
     def mu(self, key, data):
@@ -246,25 +249,25 @@ class SphinxParams:
     def hb(self, alpha, s):
         "Compute a hash of alpha and s to use as a blinding factor"
         group = self.group
-        return group.makeexp(self.hash_func("hb:" + group.printable(alpha)
-                                            + " , " + group.printable(s)))
+        return group.makeexp(self.hash_func(BLINDING_HASH_PREFIX + alpha + s))
+
 
     def hrho(self, s):
         "Compute a hash of s to use as a key for the PRG rho"
         group = self.group
-        return (self.hash_func("hrho:" + group.printable(s)))[:self.k]
+        return (self.hash_func(RHO_HASH_PREFIX + s))[:self.k]
 
     def hmu(self, s):
         "Compute a hash of s to use as a key for the HMAC mu"
         group = self.group
-        return (self.hash_func("hmu:" + group.printable(s)))[:self.k]
+        return (self.hash_func(MU_HASH_PREFIX + s))[:self.k]
 
     def hpi(self, s):
         "Compute a hash of s to use as a key for the PRP pi"
         group = self.group
-        return self.hash_func("hpi:" + group.printable(s))[:self.k]
+        return self.hash_func(PI_HASH_PREFIX + s)[:self.k]
 
     def htau(self, s):
         "Compute a hash of s to use to see if we've seen s before"
         group = self.group
-        return self.hash_func("htau:" + group.printable(s))
+        return self.hash_func(TAU_HASH_PREFIX + s)
