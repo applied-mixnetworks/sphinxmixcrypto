@@ -157,10 +157,10 @@ class SphinxNode:
             beta = B[p.k*2:]
             try:
                 payload = p.pii(p.hpi(s), payload)
-            except KeyMismatchException, e:
+            except KeyMismatchException:
                 result.error_invalid_session_key = True
                 return result
-            except BlockSizeMismtachException, e:
+            except BlockSizeMismtachException:
                 result.error_invalid_block_size = True
                 return result
             result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
