@@ -7,54 +7,55 @@ from sphinxmixcrypto.node import unpad_body, pad_body
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 
 
-class TestNodeUtils(unittest.TestCase):
-    def test_pad_unpad(self):
-        message = b"hello world"
-        paded = pad_body(200, message)
-        self.failUnlessEqual(len(paded), 200)
-        orig = unpad_body(paded)
-        self.failUnlessEqual(message, orig)
+class TestSphinxCorrectness(unittest.TestCase):
 
-    def test_prefix_free_decode(self):
-        self.r = 5
+    def newTestRoute(self, numHops):
+        self.r = numHops
         self.params = SphinxParams(
             self.r, group_class = GroupECC,
             hash_func = Blake2_hash,
             lioness_class = Chacha_Lioness,
             stream_cipher = Chacha20_stream_cipher,
         )
-        node = SphinxNode(self.params)
-        s = b""
-        message_type, val, rest = node._prefix_free_decode(s)
-        self.failUnless(message_type is None)
-        self.failUnless(val is None)
-        self.failUnless(rest is None)
+        self.node_map = {}
+        for i in range(numHops):
+            node = SphinxNode(self.params)
+            self.node_map[node.get_id()] = node
+        route = rand_subset(self.node_map.keys(), self.r)
+        return route
 
-        s = b"\x00" * 200
-        message_type, val, rest = node._prefix_free_decode(s)
-        self.failUnless(message_type == "Dspec")
-        self.failUnless(val is None)
-        self.failUnless(rest == s[1:])
+    def test_sphinx_single_hop(self):
+        route = self.newTestRoute(1)
+        destination = b"dest"
+        message = b"this is a test"
+        header, payload = create_forward_message(self.params, route, self.node_map, destination, message)
+        result = self.node_map[route[0]].process(header, payload)
+        self.failIf(result.has_error())
+        self.failIf(len(result.tuple_exit_hop) == 0)
+        self.failIf(len(result.tuple_next_hop) != 0)
+        self.failIf(len(result.tuple_client_hop) != 0)
+        received_dest, received_message = result.tuple_exit_hop
+        self.failUnless(received_dest, destination)
+        self.failUnless(received_message, message)
 
-        s = b"\xFF" * 200
-        message_type, val, rest = node._prefix_free_decode(s)
-        self.failUnless(message_type == "node")
-        self.failUnless(val == s[:node.p.k])
-        self.failUnless(rest == s[node.p.k:])
+    def test_sphinx_replay(self):
+        route = self.newTestRoute(5)
+        destination = b"dest"
+        message = b"this is a test"
+        header, payload = create_forward_message(self.params, route, self.node_map, destination, message)
+        result = self.node_map[route[0]].process(header, payload)
+        self.failIf(result.has_error())
+        result = self.node_map[route[0]].process(header, payload)
+        self.failUnless(result.error_tag_seen_already)
 
-        s = b"\x03" + b"\xFF" * 200
-        message_type, val, rest = node._prefix_free_decode(s)
-        self.failUnless(message_type == "dest")
-        self.failUnless(val == s[1:ord(s[0:1])+1])
-        self.failUnless(rest == s[ord(s[0:1])+1:])
+    def test_sphinx_assoc_data(self):
+        route = self.newTestRoute(5)
+        destination = b"dest"
+        message = b"this is a test"
+        header, payload = create_forward_message(self.params, route, self.node_map, destination, message)
+        result = self.node_map[route[0]].process(header, b"somethingelse")
+        self.failUnless(result.error_invalid_block_size == True)
 
-        s = b"\xFE" + b"\xFF" * 200
-        message_type, val, rest = node._prefix_free_decode(s)
-        self.failUnless(message_type is None)
-        self.failUnless(val is None)
-        self.failUnless(rest is None)
-
-        
 class TestSphinxECCGroup(unittest.TestCase):
 
     def setUp(self):

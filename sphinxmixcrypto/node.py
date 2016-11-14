@@ -25,6 +25,12 @@ import os
 import re
 import binascii
 
+class KeyMismatchException(Exception):
+    pass
+
+class BlockSizeMismtachException(Exception):
+    pass
+
 # The special destination
 DSPEC = b"\x00"
 
@@ -59,6 +65,8 @@ class MessageResult:
     def __init__(self):
         self.error_invalid_message_type = False
         self.error_invalid_dspec = False
+        self.error_invalid_session_key = False
+        self.error_invalid_block_size = False
         self.error_no_such_client = False
         self.error_not_in_alpha_group = False
         self.error_tag_seen_already = False
@@ -147,7 +155,14 @@ class SphinxNode:
             alpha = group.expon(alpha, b)
             gamma = B[p.k:p.k*2]
             beta = B[p.k*2:]
-            payload = p.pii(p.hpi(s), payload)
+            try:
+                payload = p.pii(p.hpi(s), payload)
+            except KeyMismatchException, e:
+                result.error_invalid_session_key = True
+                return result
+            except BlockSizeMismtachException, e:
+                result.error_invalid_block_size = True
+                return result
             result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
             return result
         elif message_type == "Dspec":

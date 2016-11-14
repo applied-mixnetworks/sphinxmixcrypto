@@ -25,6 +25,7 @@ used to encrypt/decrypt sphinx mixnet packets.
 
 import os
 import binascii
+from functools import reduce
 
 from Crypto.Cipher import AES
 from Crypto.Hash import SHA256, HMAC
@@ -37,7 +38,7 @@ from Cryptodome.Cipher import ChaCha20
 from pylioness import Chacha20_Blake2b_Lioness, AES_SHA256_Lioness
 
 from sphinxmixcrypto.nym_server import Nymserver
-from functools import reduce
+from sphinxmixcrypto.node import KeyMismatchException, BlockSizeMismtachException
 
 
 BLINDING_HASH_PREFIX = b'\0x11'
@@ -241,8 +242,10 @@ class SphinxParams:
 
     # The inverse PRP; key is of length k, data is of length m
     def pii(self, key, data):
-        assert len(key) == self.k
-        assert len(data) == self.m
+        if len(key) != self.k:
+            raise KeyMismatchException()
+        if len(data) != self.m:
+            raise BlockSizeMismtachException()
 
         return self.lioness_decrypt(key, data)
 
