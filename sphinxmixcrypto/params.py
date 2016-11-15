@@ -38,7 +38,7 @@ from Cryptodome.Cipher import ChaCha20
 from pylioness import Chacha20_Blake2b_Lioness, AES_SHA256_Lioness
 
 from sphinxmixcrypto.nym_server import Nymserver
-from sphinxmixcrypto.node import KeyMismatchException, BlockSizeMismtachException
+from sphinxmixcrypto.node import KeyMismatchError, BlockSizeMismatchError
 
 
 BLINDING_HASH_PREFIX = b'\0x11'
@@ -243,9 +243,9 @@ class SphinxParams:
     # The inverse PRP; key is of length k, data is of length m
     def pii(self, key, data):
         if len(key) != self.k:
-            raise KeyMismatchException()
+            raise KeyMismatchError()
         if len(data) != self.m:
-            raise BlockSizeMismtachException()
+            raise BlockSizeMismatchError()
 
         return self.lioness_decrypt(key, data)
 

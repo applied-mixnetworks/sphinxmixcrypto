@@ -3,7 +3,7 @@ import unittest
 
 from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash
 from sphinxmixcrypto import SphinxNode
-from sphinxmixcrypto.node import unpad_body, pad_body
+from sphinxmixcrypto.node import unpad_body, pad_body, ReplayError, BlockSizeMismatchError
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 
 
@@ -29,8 +29,7 @@ class TestSphinxCorrectness(unittest.TestCase):
         destination = b"dest"
         message = b"this is a test"
         header, payload = create_forward_message(self.params, route, self.node_map, destination, message)
-        result = self.node_map[route[0]].process(header, payload)
-        self.failIf(result.has_error())
+        result = self.node_map[route[0]].unwrap(header, payload)
         self.failIf(len(result.tuple_exit_hop) == 0)
         self.failIf(len(result.tuple_next_hop) != 0)
         self.failIf(len(result.tuple_client_hop) != 0)
@@ -43,18 +42,17 @@ class TestSphinxCorrectness(unittest.TestCase):
         destination = b"dest"
         message = b"this is a test"
         header, payload = create_forward_message(self.params, route, self.node_map, destination, message)
-        result = self.node_map[route[0]].process(header, payload)
-        self.failIf(result.has_error())
-        result = self.node_map[route[0]].process(header, payload)
-        self.failUnless(result.error_tag_seen_already)
+        result = self.node_map[route[0]].unwrap(header, payload)
+        with self.assertRaises(ReplayError):
+            result = self.node_map[route[0]].unwrap(header, payload)
 
     def test_sphinx_assoc_data(self):
         route = self.newTestRoute(5)
         destination = b"dest"
         message = b"this is a test"
         header, payload = create_forward_message(self.params, route, self.node_map, destination, message)
-        result = self.node_map[route[0]].process(header, b"somethingelse")
-        self.failUnless(result.error_invalid_block_size == True)
+        with self.assertRaises(BlockSizeMismatchError):
+            result = self.node_map[route[0]].unwrap(header, b"somethingelse")
 
 class TestSphinxECCGroup(unittest.TestCase):
 
@@ -89,13 +87,11 @@ class TestSphinxECCGroup(unittest.TestCase):
 
         def send_to_mix(destination, header, payload):
             print("send_to_mix")
-            return self.node_map[destination].process(header, payload)
+            return self.node_map[destination].unwrap(header, payload)
 
-        result = self.node_map[self.route[0]].process(header, delta)
+        result = self.node_map[self.route[0]].unwrap(header, delta)
         def mixnet_test_state_machine(result):
             while True:
-                #result.print_error()
-                self.failIf(result.has_error())
                 if result.tuple_next_hop:
                     print("result.tuple_next_hop")
                     result = send_to_mix(result.tuple_next_hop[0], result.tuple_next_hop[1], result.tuple_next_hop[2])
@@ -104,7 +100,6 @@ class TestSphinxECCGroup(unittest.TestCase):
                     break
                 elif result.tuple_client_hop:
                     result = send_to_client(*result.tuple_client_hop)
-                    self.failIf(result.has_error())
                     print("[%s] received by [%s]" % (result.tuple_message[1], result.tuple_message[0]))
                     break
 
@@ -124,8 +119,4 @@ class TestSphinxECCGroup(unittest.TestCase):
         nym_result = self.params.nymserver.process(nym_id, reply_message)
 
         print("Nymserver received message for [%s]" % nym_id)
-        if nym_result.has_error():
-            print("No SURBs available for nym [%s]" % nym_id)
-        self.failIf(nym_result.has_error())
-
         mixnet_test_state_machine(nym_result.message_result)

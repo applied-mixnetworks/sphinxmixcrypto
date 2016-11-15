@@ -17,17 +17,14 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-from sphinxmixcrypto.node import pad_body, MessageResult
+from sphinxmixcrypto.node import pad_body, UnwrappedMessage
+
+class SphinxNoSURBSAvailableError(Exception):
+    pass
 
 class NymResult:
     def __init__(self):
-        self.error_no_surbs_available = False
         self.message_result = None
-
-    def has_error(self):
-        if self.error_no_surbs_available:
-            return True
-        return False
 
 class Nymserver:
     def __init__(self, params):
@@ -48,9 +45,9 @@ class Nymserver:
         if nym in db and len(db[nym]) > 0:
             n0, header0, ktilde = db[nym].pop(0)
             body = p.pi(ktilde, pad_body(p.m, (b"\x00" * p.k) + message))
-            message = MessageResult()
+            message = UnwrappedMessage()
             message.tuple_next_hop = (n0, header0, body)
             result.message_result = message
         else:
-            result.error_no_surbs_available = True
+            raise SphinxNoSURBSAvailableError
         return result

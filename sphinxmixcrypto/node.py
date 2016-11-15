@@ -25,10 +25,31 @@ import os
 import re
 import binascii
 
-class KeyMismatchException(Exception):
+class HeaderAlphaGroupMismatchError(Exception):
     pass
 
-class BlockSizeMismtachException(Exception):
+class ReplayError(Exception):
+    pass
+
+class IncorrectMACError(Exception):
+    pass
+
+class InvalidSpecialDestinationError(Exception):
+    pass
+
+class NoSuchClientError(Exception):
+    pass
+
+class InvalidMessageTypeError(Exception):
+    pass
+
+class NoSURBSAvailableError(Exception):
+    pass
+
+class KeyMismatchError(Exception):
+    pass
+
+class BlockSizeMismatchError(Exception):
     pass
 
 # The special destination
@@ -61,31 +82,11 @@ def destination_encode(dest):
     return b"%c" % len(dest) + dest
 
 
-class MessageResult:
+class UnwrappedMessage:
     def __init__(self):
-        self.error_invalid_message_type = False
-        self.error_invalid_dspec = False
-        self.error_invalid_session_key = False
-        self.error_invalid_block_size = False
-        self.error_no_such_client = False
-        self.error_not_in_alpha_group = False
-        self.error_tag_seen_already = False
-        self.error_mac_mismatch = False
         self.tuple_next_hop = ()
         self.tuple_exit_hop = ()
         self.tuple_client_hop = ()
-
-    def print_error(self):
-        for err in [x for x in dir(self) if x.startswith('error')]:
-            if getattr(self, err):
-                print(("err %s is %s" % (err, getattr(self, err))))
-
-    def has_error(self):
-        for err in [x for x in dir(self) if x.startswith('error')]:
-            if getattr(self, err):
-                print(("err %s is %s" % (err, getattr(self, err))))  # XXX
-                return True
-        return False
 
 
 class SphinxNode:
@@ -125,27 +126,25 @@ class SphinxNode:
             return 'dest', s[1:l+1], s[l+1:]
         return None, None, None
 
-    def process(self, header, payload):
+    def unwrap(self, header, payload):
         """
-        process returns a MessageResult given a header and payload
+        unwrap returns a UnwrappedMessage given a header and payload
+        or raises an exception if an error was encountered
         """
-        result = MessageResult()
+        result = UnwrappedMessage()
         p = self.p
         group = p.group
         alpha, beta, gamma = header
 
         if not group.in_group(alpha):
-            result.error_not_in_alpha_group = True
-            return result
+            raise HeaderAlphaGroupMismatchError()
         s = group.expon(alpha, self.__x)
         tag = p.htau(s)
 
         if tag in self.seen:
-            result.error_tag_seen_already = True
-            return result
+            raise ReplayError()
         if gamma != p.mu(p.hmu(s), beta):
-            result.error_mac_mismatch = True
-            return result
+            raise IncorrectMACError()
 
         self.seen[tag] = 1
         B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
@@ -155,14 +154,10 @@ class SphinxNode:
             alpha = group.expon(alpha, b)
             gamma = B[p.k:p.k*2]
             beta = B[p.k*2:]
-            try:
-                payload = p.pii(p.hpi(s), payload)
-            except KeyMismatchException:
-                result.error_invalid_session_key = True
-                return result
-            except BlockSizeMismtachException:
-                result.error_invalid_block_size = True
-                return result
+
+            # XXX this may raise KeyMismatchError or BlockSizeMismatchError
+            payload = p.pii(p.hpi(s), payload)
+
             result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
             return result
         elif message_type == "Dspec":
@@ -175,8 +170,7 @@ class SphinxNode:
                     self.received.append(body)
                     result.tuple_exit_hop = (val, body)
                     return result
-            result.error_invalid_dspec = True
-            return result
+            raise InvalidSpecialDestinationError()
         elif message_type == "dest":
             id = rest[:p.k]
             payload = p.pii(p.hpi(s), payload)
@@ -184,8 +178,5 @@ class SphinxNode:
                 result.tuple_client_hop = (val, id, payload)
                 return result
             else:
-                result.error_no_such_client = True
-                return result
-
-        result.error_invalid_message_type = True
-        return result
+                raise NoSuchClientError()
+        raise InvalidMessageTypeError()

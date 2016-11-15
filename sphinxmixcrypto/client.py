@@ -95,16 +95,15 @@ def create_surb(params, route, node_map, dest):
     return id, keytuple, (route[0], header, ktilde)
 
 
+class NymKeyNotFoundError(Exception):
+    pass
+
+class CorruptMessageError(Exception):
+    pass
+
 class ClientMessage:
     def __init__(self):
         self.payload = None
-        self.error_nym_key_not_found = False
-        self.error_corrupt_message = False
-    def has_error(self):
-        if self.error_nym_key_not_found or self.error_corrupt_message:
-            return True
-        return False
-
 
 class SphinxClient:
     def __init__(self, params):
@@ -130,9 +129,7 @@ class SphinxClient:
         keytuple = self.keytable.pop(id, None)
 
         if keytuple == None:
-            message.error_nym_key_not_found = True
-            return message
-
+            raise NymKeyNotFoundError
         ktilde = keytuple.pop(0)
         route_len = len(keytuple)
         for i in range(route_len-1, -1, -1):
@@ -144,5 +141,4 @@ class SphinxClient:
             message.tuple_message = (self.id, msg)
             return message
 
-        message.error_corrupt_message = True
-        return message
+        raise CorruptMessageError
