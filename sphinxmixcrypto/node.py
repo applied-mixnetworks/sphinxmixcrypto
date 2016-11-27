@@ -81,6 +81,14 @@ def destination_encode(dest):
     assert len(dest) >= 1 and len(dest) <= 127
     return b"%c" % len(dest) + dest
 
+def generate_node_id(id_length, idnum):
+    """
+    generate a new node id
+    """
+
+    node_id = b"\xff" + idnum + (b"\x00" * (id_length - len(idnum) - 1))
+    return node_id
+
 
 class UnwrappedMessage:
     def __init__(self):
@@ -90,24 +98,22 @@ class UnwrappedMessage:
 
 
 class SphinxNode:
-    def __init__(self, params):
+    def __init__(self, params, node_id=None):
         self.received = []
         self.p = params
         group = self.p.group
         self.__x = group.gensecret()
         self.y = group.expon(group.generator, self.__x)
+
         idnum = os.urandom(4)
-        self.id = self.__Nenc(idnum)
+        if node_id is None:
+            self.id = generate_node_id(self.params.k, idnum)
+
         self.name = "Node " + str(binascii.b2a_hex(idnum))
         self.seen = {}
 
     def get_id(self):
         return self.id
-
-    def __Nenc(self, idnum):
-        id = b"\xff" + idnum + (b"\x00" * (self.p.k - len(idnum) - 1))
-        assert len(id) == self.p.k
-        return id
 
     # Decode the prefix-free encoding.  Return the type, value, and the
     # remainder of the input string
