@@ -124,9 +124,9 @@ class SphinxClient:
         self.keytable[id] = keytuple
         return nymtuple
 
-    def process(self, id, delta):
+    def decrypt(self, id, delta):
         """
-        Process a (still-encrypted) reply message
+        decrypt reply message
         """
         message = ClientMessage()
         p = self.params
