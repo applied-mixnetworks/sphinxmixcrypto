@@ -38,8 +38,8 @@ class TestNodeUtils(unittest.TestCase):
         s = b"\xFF" * 200
         message_type, val, rest = node._prefix_free_decode(s)
         self.failUnless(message_type == "node")
-        self.failUnless(val == s[:node.p.k])
-        self.failUnless(rest == s[node.p.k:])
+        self.failUnless(val == s[:node.params.k])
+        self.failUnless(rest == s[node.params.k:])
 
         s = b"\x03" + b"\xFF" * 200
         message_type, val, rest = node._prefix_free_decode(s)

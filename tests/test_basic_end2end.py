@@ -18,9 +18,11 @@ class TestSphinxCorrectness(unittest.TestCase):
             stream_cipher = Chacha20_stream_cipher,
         )
         self.node_map = {}
+        self.consensus = {}
         for i in range(numHops):
             node = SphinxNode(self.params)
             self.node_map[node.get_id()] = node
+            self.consensus[node.get_id()] = node.public_key
         route = rand_subset(self.node_map.keys(), self.r)
         return route
 
@@ -28,7 +30,8 @@ class TestSphinxCorrectness(unittest.TestCase):
         route = self.newTestRoute(1)
         destination = b"dest"
         message = b"this is a test"
-        header, payload = create_forward_message(self.params, route, self.node_map, destination, message)
+        header, payload = create_forward_message(self.params, route, self.consensus, destination, message)
+        print("after create forward message")
         result = self.node_map[route[0]].unwrap(header, payload)
         self.failIf(len(result.tuple_exit_hop) == 0)
         self.failIf(len(result.tuple_next_hop) != 0)
@@ -41,7 +44,7 @@ class TestSphinxCorrectness(unittest.TestCase):
         route = self.newTestRoute(5)
         destination = b"dest"
         message = b"this is a test"
-        header, payload = create_forward_message(self.params, route, self.node_map, destination, message)
+        header, payload = create_forward_message(self.params, route, self.consensus, destination, message)
         result = self.node_map[route[0]].unwrap(header, payload)
         with self.assertRaises(ReplayError):
             result = self.node_map[route[0]].unwrap(header, payload)
@@ -50,9 +53,9 @@ class TestSphinxCorrectness(unittest.TestCase):
         route = self.newTestRoute(5)
         destination = b"dest"
         message = b"this is a test"
-        header, payload = create_forward_message(self.params, route, self.node_map, destination, message)
+        header, payload = create_forward_message(self.params, route, self.consensus, destination, message)
         with self.assertRaises(BlockSizeMismatchError):
-            result = self.node_map[route[0]].unwrap(header, b"somethingelse")
+            result = self.node_map[route[0]].unwrap(header, b"somethingelse!!!!!!!!!!!!!!")
 
 class TestSphinxECCGroup(unittest.TestCase):
 
@@ -66,10 +69,12 @@ class TestSphinxECCGroup(unittest.TestCase):
         )
 
         self.node_map = {}
+        self.consensus = {}
         # Create some nodes
         for i in range(2*self.r):
             node = SphinxNode(self.params)
             self.node_map[node.get_id()] = node
+            self.consensus[node.get_id()] = node.public_key
 
         # Create a client
         self.client = SphinxClient(self.params)
@@ -78,7 +83,7 @@ class TestSphinxECCGroup(unittest.TestCase):
 
     def test_end_to_end(self):
         message = b"this is a test"
-        header, delta = create_forward_message(self.params, self.route, self.node_map, b"dest", message)
+        header, delta = create_forward_message(self.params, self.route, self.consensus, b"dest", message)
         # Send it to the first node for processing
 
         def send_to_client(client_id, message_id, delta):
@@ -109,7 +114,7 @@ class TestSphinxECCGroup(unittest.TestCase):
         # Create a reply block for the client
         reply_route = rand_subset(self.node_map.keys(), self.r)
         nym = b"cypherpunk"
-        nym_tuple = self.client.create_nym(nym, reply_route, self.node_map)
+        nym_tuple = self.client.create_nym(nym, reply_route, self.consensus)
         self.params.nymserver.add_surb(nym, nym_tuple)
         # Send a message to it
         reply_message = b"this is a reply"

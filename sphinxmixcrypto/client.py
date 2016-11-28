@@ -21,6 +21,7 @@ import os
 import binascii
 from sphinxmixcrypto.node import destination_encode, DSPEC, pad_body, unpad_body
 
+
 def rand_subset(lst, nu):
     """
     Return a list of nu random elements of the given list (without
@@ -45,7 +46,7 @@ def create_header(params, route, node_map, dest, id):
     asbtuples = []
     for node in route:
         alpha = group.multiexpon(group.generator, blinds)
-        s = group.multiexpon(node_map[node].y, blinds)
+        s = group.multiexpon(node_map[node], blinds)
         b = p.hb(alpha, s)
         blinds.append(b)
         asbtuples.append({'alpha': alpha, 's': s, 'b': b})
@@ -106,9 +107,12 @@ class ClientMessage:
         self.payload = None
 
 class SphinxClient:
-    def __init__(self, params):
-        self.id = b"Client " + bytes(str(binascii.hexlify(os.urandom(4))).encode("utf-8"))
+    def __init__(self, params, id=None):
         self.params = params
+        if id is None:
+            self.id = b"Client " + bytes(str(binascii.hexlify(os.urandom(4))).encode("utf-8"))
+        else:
+            self.id = id
         params.clients[self.id] = self
         self.keytable = {}
 

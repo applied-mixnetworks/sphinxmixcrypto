@@ -85,10 +85,19 @@ def generate_node_id(id_length, idnum):
     """
     generate a new node id
     """
-
     node_id = b"\xff" + idnum + (b"\x00" * (id_length - len(idnum) - 1))
     return node_id
 
+def generate_node_id_name(id_len):
+    idnum = os.urandom(4)
+    id = generate_node_id(id_len, idnum)
+    name = "Node " + str(binascii.b2a_hex(idnum))
+    return id, name
+
+def generate_node_keypair(group):
+    private_key = group.gensecret()
+    public_key = group.expon(group.generator, private_key)
+    return public_key, private_key
 
 class UnwrappedMessage:
     def __init__(self):
@@ -96,20 +105,26 @@ class UnwrappedMessage:
         self.tuple_exit_hop = ()
         self.tuple_client_hop = ()
 
+class SphinxNodeOptions:
+    def __init__(self):
+        self.private_key = None
+        self.public_key = None
+        self.id = None
+        self.name = None
 
 class SphinxNode:
-    def __init__(self, params, node_id=None):
+    def __init__(self, params, options=None):
+        self.params = params
+        if options is None:
+            self.public_key, self.private_key = generate_node_keypair(self.params.group)
+            self.id, self.name = generate_node_id_name(self.params.k)
+        else:
+            assert isinstance(options, SphinxNodeOptions)
+            self.private_key = options.private_key
+            self.public_key = options.public_key
+            self.id = options.id
+            self.name = options.name
         self.received = []
-        self.p = params
-        group = self.p.group
-        self.__x = group.gensecret()
-        self.y = group.expon(group.generator, self.__x)
-
-        idnum = os.urandom(4)
-        if node_id is None:
-            self.id = generate_node_id(self.params.k, idnum)
-
-        self.name = "Node " + str(binascii.b2a_hex(idnum))
         self.seen = {}
 
     def get_id(self):
@@ -127,7 +142,7 @@ class SphinxNode:
         if l == 0:
             return 'Dspec', None, s[1:]
         if l == 255:
-            return 'node', s[:self.p.k], s[self.p.k:]
+            return 'node', s[:self.params.k], s[self.params.k:]
         if l < 128:
             return 'dest', s[1:l+1], s[l+1:]
         return None, None, None
@@ -138,13 +153,13 @@ class SphinxNode:
         or raises an exception if an error was encountered
         """
         result = UnwrappedMessage()
-        p = self.p
+        p = self.params
         group = p.group
         alpha, beta, gamma = header
 
         if not group.in_group(alpha):
             raise HeaderAlphaGroupMismatchError()
-        s = group.expon(alpha, self.__x)
+        s = group.expon(alpha, self.private_key)
         tag = p.htau(s)
 
         if tag in self.seen:
