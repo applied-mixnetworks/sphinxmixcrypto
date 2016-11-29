@@ -105,7 +105,7 @@ class UnwrappedMessage:
         self.tuple_exit_hop = ()
         self.tuple_client_hop = ()
 
-class SphinxNodeOptions:
+class SphinxNodeState:
     def __init__(self):
         self.private_key = None
         self.public_key = None
@@ -113,17 +113,17 @@ class SphinxNodeOptions:
         self.name = None
 
 class SphinxNode:
-    def __init__(self, params, options=None):
+    def __init__(self, params, state=None):
         self.params = params
-        if options is None:
+        if state is None:
             self.public_key, self.private_key = generate_node_keypair(self.params.group)
             self.id, self.name = generate_node_id_name(self.params.k)
         else:
-            assert isinstance(options, SphinxNodeOptions)
-            self.private_key = options.private_key
-            self.public_key = options.public_key
-            self.id = options.id
-            self.name = options.name
+            assert isinstance(state, SphinxNodeState)
+            self.private_key = state.private_key
+            self.public_key = state.public_key
+            self.id = state.id
+            self.name = state.name
         self.received = []
         self.seen = {}
 
