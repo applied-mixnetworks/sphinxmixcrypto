@@ -30,7 +30,9 @@ class TestSphinxCorrectness(unittest.TestCase):
         route = self.newTestRoute(1)
         destination = b"dest"
         message = b"this is a test"
-        header, payload = create_forward_message(self.params, route, self.consensus, destination, message)
+        alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message)
+        header = alpha, beta, gamma
+        payload = delta
         print("after create forward message")
         result = self.node_map[route[0]].unwrap(header, payload)
         self.failIf(len(result.tuple_exit_hop) == 0)
@@ -44,7 +46,9 @@ class TestSphinxCorrectness(unittest.TestCase):
         route = self.newTestRoute(5)
         destination = b"dest"
         message = b"this is a test"
-        header, payload = create_forward_message(self.params, route, self.consensus, destination, message)
+        alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message)
+        header = alpha, beta, gamma
+        payload = delta
         result = self.node_map[route[0]].unwrap(header, payload)
         with self.assertRaises(ReplayError):
             result = self.node_map[route[0]].unwrap(header, payload)
@@ -53,7 +57,9 @@ class TestSphinxCorrectness(unittest.TestCase):
         route = self.newTestRoute(5)
         destination = b"dest"
         message = b"this is a test"
-        header, payload = create_forward_message(self.params, route, self.consensus, destination, message)
+        alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message)
+        header = alpha, beta, gamma
+        payload = delta
         with self.assertRaises(BlockSizeMismatchError):
             result = self.node_map[route[0]].unwrap(header, b"somethingelse!!!!!!!!!!!!!!")
 
@@ -83,17 +89,19 @@ class TestSphinxECCGroup(unittest.TestCase):
 
     def test_end_to_end(self):
         message = b"this is a test"
-        header, delta = create_forward_message(self.params, self.route, self.consensus, b"dest", message)
-        # Send it to the first node for processing
+        alpha, beta, gamma, delta = create_forward_message(self.params, self.route, self.consensus, self.route[-1], message)
+        header = alpha, beta, gamma
+        payload = delta
 
         def send_to_client(client_id, message_id, delta):
             print("send_to_client")
-            return self.params.clients[client_id].process(message_id, delta)
+            return self.params.clients[client_id].decrypt(message_id, delta)
 
         def send_to_mix(destination, header, payload):
             print("send_to_mix")
             return self.node_map[destination].unwrap(header, payload)
 
+        # Send it to the first node for processing
         result = self.node_map[self.route[0]].unwrap(header, delta)
         def mixnet_test_state_machine(result):
             while True:

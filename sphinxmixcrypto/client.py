@@ -81,7 +81,8 @@ def create_forward_message(params, route, node_map, dest, msg):
     delta = p.pi(p.hpi(secrets[route_len-1]), body)
     for i in range(route_len-2, -1, -1):
         delta = p.pi(p.hpi(secrets[i]), delta)
-    return header, delta
+    alpha, beta, gamma = header
+    return alpha, beta, gamma, delta
 
 def create_surb(params, route, node_map, dest):
     p = params
@@ -124,13 +125,13 @@ class SphinxClient:
         self.keytable[id] = keytuple
         return nymtuple
 
-    def decrypt(self, id, delta):
+    def decrypt(self, nym_id, delta):
         """
         decrypt reply message
         """
         message = ClientMessage()
         p = self.params
-        keytuple = self.keytable.pop(id, None)
+        keytuple = self.keytable.pop(nym_id, None)
 
         if keytuple == None:
             raise NymKeyNotFoundError
