@@ -94,6 +94,7 @@ class GroupP:
 
 class GroupECC:
     "Group operations in curve25519"
+    size = 32
 
     def __init__(self):
 
@@ -123,7 +124,7 @@ class GroupECC:
         return bytes(bytearray(curve_out))
 
     def gensecret(self):
-        return self.makesecret(os.urandom(32))
+        return self.makesecret(os.urandom(self.size))
 
     def expon(self, base, exp):
         return crypto_scalarmult(bytes(exp), bytes(base))
@@ -134,12 +135,12 @@ class GroupECC:
         return reduce(self.expon, baseandexps)
 
     def makeexp(self, data):
-        assert len(data) == 32
+        assert len(data) == self.size
         return self.makesecret(data)
 
     def in_group(self, alpha):
         # All strings of length 32 are in the group, says DJB
-        return len(alpha) == 32
+        return len(alpha) == self.size
 
 
 def SHA256_hash(data):
@@ -210,6 +211,20 @@ class SphinxParams:
         self.stream_cipher = stream_cipher
         self.nymserver = Nymserver(self)
 
+    def get_dimensions(self):
+        """
+        header overhead = p + (2r + 2)s
+        where p is the asymmetric element,
+        s is the symmetric element and
+        r is the max route length
+        alpha 32 beta 176 gamma 16 delta 1024
+        """
+        alpha = self.group.size
+        beta = (2 * self.r + 1) * self.k
+        gamma = self.k
+        delta = self.m
+        return alpha, beta, gamma, delta
+
     def lioness_encrypt(self, key, data):
         c = self.lioness_class(key, len(data))
         return c.encrypt(data)
@@ -231,6 +246,7 @@ class SphinxParams:
 
     # The HMAC; key is of length k, output is of length k
     def mu(self, key, data):
+        # XXX fix me use parameterized hash function
         m = HMAC.new(key, msg=data, digestmod=SHA256)
         return m.digest()[:self.k]
 
@@ -251,26 +267,20 @@ class SphinxParams:
 
     def hb(self, alpha, s):
         "Compute a hash of alpha and s to use as a blinding factor"
-        group = self.group
-        return group.makeexp(self.hash_func(BLINDING_HASH_PREFIX + alpha + s))
-
+        return self.group.makeexp(self.hash_func(BLINDING_HASH_PREFIX + alpha + s))
 
     def hrho(self, s):
         "Compute a hash of s to use as a key for the PRG rho"
-        group = self.group
         return (self.hash_func(RHO_HASH_PREFIX + s))[:self.k]
 
     def hmu(self, s):
         "Compute a hash of s to use as a key for the HMAC mu"
-        group = self.group
         return (self.hash_func(MU_HASH_PREFIX + s))[:self.k]
 
     def hpi(self, s):
         "Compute a hash of s to use as a key for the PRP pi"
-        group = self.group
         return self.hash_func(PI_HASH_PREFIX + s)[:self.k]
 
     def htau(self, s):
         "Compute a hash of s to use to see if we've seen s before"
-        group = self.group
         return self.hash_func(TAU_HASH_PREFIX + s)
