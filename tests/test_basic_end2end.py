@@ -1,7 +1,7 @@
 
 import unittest
 
-from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash
+from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import SphinxNode
 from sphinxmixcrypto.node import unpad_body, pad_body, ReplayError, BlockSizeMismatchError
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
@@ -14,6 +14,7 @@ class TestSphinxCorrectness(unittest.TestCase):
         self.params = SphinxParams(
             self.r, group_class = GroupECC,
             hash_func = Blake2_hash,
+            hash_mac_func = Blake2_hash_mac,
             lioness_class = Chacha_Lioness,
             stream_cipher = Chacha20_stream_cipher,
         )
@@ -70,6 +71,7 @@ class TestSphinxECCGroup(unittest.TestCase):
         self.params = SphinxParams(
             self.r, group_class = GroupECC,
             hash_func = Blake2_hash,
+            hash_mac_func = Blake2_hash_mac,
             lioness_class = Chacha_Lioness,
             stream_cipher = Chacha20_stream_cipher,
         )

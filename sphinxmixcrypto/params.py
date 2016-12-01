@@ -148,10 +148,18 @@ def SHA256_hash(data):
     h.update(data)
     return h.digest()
 
+def SHA256_hash_mac(key, data, digest_size=16):
+    m = HMAC.new(key, msg=data, digestmod=SHA256)
+    return m.digest()[:digest_size]
+
 def Blake2_hash(data):
     b = blake2b(data=bytes(data))
     h = b.digest()
     return h[:32]
+
+def Blake2_hash_mac(key, data, digest_size=16):
+    b = blake2b(data=data, key=key, digest_size=digest_size)
+    return b.digest()
 
 def AES_stream_cipher(key):
     class xcounter:
@@ -202,12 +210,13 @@ class SphinxParams:
     clients = {} # mapping of destinations to clients
 
     def __init__(self, r=5, group_class=None, lioness_class=None,
-                 hash_func=None, stream_cipher=None):
+                 hash_func=None, hash_mac_func=None, stream_cipher=None):
         self.r = r
         assert group_class is not None
         self.group = group_class()
         self.lioness_class = lioness_class
         self.hash_func = hash_func
+        self.hash_mac_func = hash_mac_func
         self.stream_cipher = stream_cipher
         self.nymserver = Nymserver(self)
 
@@ -246,9 +255,8 @@ class SphinxParams:
 
     # The HMAC; key is of length k, output is of length k
     def mu(self, key, data):
-        # XXX fix me use parameterized hash function
-        m = HMAC.new(key, msg=data, digestmod=SHA256)
-        return m.digest()[:self.k]
+        m = self.hash_mac_func(key, data)
+        return m
 
     # The PRP; key is of length k, data is of length m
     def pi(self, key, data):
