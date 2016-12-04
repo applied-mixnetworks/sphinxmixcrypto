@@ -209,9 +209,9 @@ class SphinxParams:
     m = 1024 # size of message body, in bytes
     clients = {} # mapping of destinations to clients
 
-    def __init__(self, r=5, group_class=None, lioness_class=None,
+    def __init__(self, path_len=5, group_class=None, lioness_class=None,
                  hash_func=None, hash_mac_func=None, stream_cipher=None):
-        self.r = r
+        self.r = path_len
         assert group_class is not None
         self.group = group_class()
         self.lioness_class = lioness_class

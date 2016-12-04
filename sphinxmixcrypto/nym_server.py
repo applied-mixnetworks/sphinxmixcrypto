@@ -45,9 +45,9 @@ class Nymserver:
         if nym in db and len(db[nym]) > 0:
             n0, header0, ktilde = db[nym].pop(0)
             body = p.pi(ktilde, pad_body(p.m, (b"\x00" * p.k) + message))
-            message = UnwrappedMessage()
-            message.tuple_next_hop = (n0, header0, body)
-            result.message_result = message
+            unwrapped_message = UnwrappedMessage()
+            unwrapped_message.tuple_next_hop = (n0, header0, body)
+            result.message_result = unwrapped_message
         else:
             raise SphinxNoSURBSAvailableError
         return result

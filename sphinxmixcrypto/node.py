@@ -195,7 +195,7 @@ class SphinxNode:
         elif message_type == "dest":
             id = rest[:p.k]
             payload = p.pii(p.hpi(s), payload)
-            if val in p.clients:
+            if val in p.clients: # val is client-id
                 result.tuple_client_hop = (val, id, payload)
                 return result
             else:

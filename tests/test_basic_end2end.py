@@ -1,5 +1,7 @@
 
 import unittest
+import binascii
+import cbor
 
 from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import SphinxNode
@@ -85,9 +87,53 @@ class TestSphinxECCGroup(unittest.TestCase):
             self.consensus[node.get_id()] = node.public_key
 
         # Create a client
-        self.client = SphinxClient(self.params)
+        self.alice_client = SphinxClient(self.params)
         # Pick a list of nodes to use
         self.route = rand_subset(self.node_map.keys(), self.r)
+
+    def test_client_surb(self):
+        self.bob_client = SphinxClient(self.params)
+
+        route = rand_subset(self.node_map.keys(), self.r)
+        nym_id = b"Cypherpunk"
+        nym_tuple = self.alice_client.create_nym(route, self.consensus)
+        self.params.nymserver.add_surb(nym_id, nym_tuple)
+
+        print("Bob sends a message to [%s]" % nym_id)
+        reply_to_bob_surb = self.alice_client.create_nym(route, self.consensus)
+        inner_message = {
+            'surb': reply_to_bob_surb,
+        }
+        message = cbor.dumps(inner_message)
+        nym_result = self.params.nymserver.process(nym_id, message)
+        received_client_message = self.mixnet_test_state_machine(nym_result.message_result)
+
+        inner_message = cbor.loads(received_client_message)
+        assert inner_message.has_key('surb')
+        surb = inner_message['surb']
+
+        # XXX todo: Bob's send message on his choosen route to -> mix proxy to SURB -> Alice
+
+    def mixnet_test_state_machine(self, result):
+        while True:
+            if result.tuple_next_hop:
+                print("result.tuple_next_hop")
+                result = self.send_to_mix(result.tuple_next_hop[0], result.tuple_next_hop[1], result.tuple_next_hop[2])
+            elif result.tuple_exit_hop:
+                print("Deliver [%s] to [%s]" % (result.tuple_exit_hop[1], binascii.hexlify(result.tuple_exit_hop[0])))
+                break
+            elif result.tuple_client_hop:
+                result = self.send_to_client(*result.tuple_client_hop)
+                print("message received by [%s]" % result.tuple_message[0])
+                return result.tuple_message[1]
+
+    def send_to_client(self, client_id, message_id, delta):
+        print("send_to_client client_id %s message_id %s delta len %s" % (client_id, binascii.hexlify(message_id), len(delta)))
+        return self.params.clients[client_id].decrypt(message_id, delta)
+
+    def send_to_mix(self, destination, header, payload):
+        print("send_to_mix")
+        return self.node_map[destination].unwrap(header, payload)
 
     def test_end_to_end(self):
         message = b"this is a test"
@@ -95,43 +141,20 @@ class TestSphinxECCGroup(unittest.TestCase):
         header = alpha, beta, gamma
         payload = delta
 
-        def send_to_client(client_id, message_id, delta):
-            print("send_to_client")
-            return self.params.clients[client_id].decrypt(message_id, delta)
-
-        def send_to_mix(destination, header, payload):
-            print("send_to_mix")
-            return self.node_map[destination].unwrap(header, payload)
-
         # Send it to the first node for processing
         result = self.node_map[self.route[0]].unwrap(header, delta)
-        def mixnet_test_state_machine(result):
-            while True:
-                if result.tuple_next_hop:
-                    print("result.tuple_next_hop")
-                    result = send_to_mix(result.tuple_next_hop[0], result.tuple_next_hop[1], result.tuple_next_hop[2])
-                elif result.tuple_exit_hop:
-                    print("Deliver [%s] to [%s]" % (result.tuple_exit_hop[1], result.tuple_exit_hop[0]))
-                    break
-                elif result.tuple_client_hop:
-                    result = send_to_client(*result.tuple_client_hop)
-                    print("[%s] received by [%s]" % (result.tuple_message[1], result.tuple_message[0]))
-                    break
-
-        mixnet_test_state_machine(result)
+        self.mixnet_test_state_machine(result)
         self.failUnlessEqual(self.node_map[self.route[-1]].received[0], message)
 
         # Create a reply block for the client
         reply_route = rand_subset(self.node_map.keys(), self.r)
         nym = b"cypherpunk"
-        nym_tuple = self.client.create_nym(nym, reply_route, self.consensus)
+        nym_tuple = self.alice_client.create_nym(reply_route, self.consensus)
         self.params.nymserver.add_surb(nym, nym_tuple)
+
         # Send a message to it
         reply_message = b"this is a reply"
         nym_id = b"cypherpunk"
-
         print("Nymserver received message for [%s]" % nym_id)
         nym_result = self.params.nymserver.process(nym_id, reply_message)
-
-        print("Nymserver received message for [%s]" % nym_id)
-        mixnet_test_state_machine(nym_result.message_result)
+        self.mixnet_test_state_machine(nym_result.message_result)

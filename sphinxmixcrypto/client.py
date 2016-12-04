@@ -117,21 +117,21 @@ class SphinxClient:
         params.clients[self.id] = self
         self.keytable = {}
 
-    def create_nym(self, nym, route, node_map):
+    def create_nym(self, route, node_map):
         """Create a SURB for the given nym (passing through nllength
         nodes), and send it to the nymserver."""
 
-        id, keytuple, nymtuple = create_surb(self.params, route, node_map, self.id)
-        self.keytable[id] = keytuple
+        message_id, keytuple, nymtuple = create_surb(self.params, route, node_map, self.id)
+        self.keytable[message_id] = keytuple
         return nymtuple
 
-    def decrypt(self, nym_id, delta):
+    def decrypt(self, message_id, delta):
         """
         decrypt reply message
         """
         message = ClientMessage()
         p = self.params
-        keytuple = self.keytable.pop(nym_id, None)
+        keytuple = self.keytable.pop(message_id, None)
 
         if keytuple == None:
             raise NymKeyNotFoundError
