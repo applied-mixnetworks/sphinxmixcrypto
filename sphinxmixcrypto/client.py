@@ -3,16 +3,16 @@
 # Copyright 2011 Ian Goldberg
 #
 # This file is part of Sphinx.
-# 
+#
 # Sphinx is free software: you can redistribute it and/or modify
 # it under the terms of version 3 of the GNU Lesser General Public
 # License as published by the Free Software Foundation.
-# 
+#
 # Sphinx is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU Lesser General Public License for more details.
-# 
+#
 # You should have received a copy of the GNU Lesser General Public
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
@@ -28,10 +28,11 @@ def rand_subset(lst, nu):
     replacement).
     """
     # Randomize the order of the list by sorting on a random key
-    nodeids = [(os.urandom(8),x) for x in lst]
-    nodeids.sort(key=lambda x:x[0])
+    nodeids = [(os.urandom(8), x) for x in lst]
+    nodeids.sort(key=lambda x: x[0])
     # Return the first nu elements of the randomized list
     return [x[1] for x in nodeids[:nu]]
+
 
 def create_header(params, route, node_map, dest, id):
     p = params
@@ -52,22 +53,23 @@ def create_header(params, route, node_map, dest, id):
         asbtuples.append({'alpha': alpha, 's': s, 'b': b})
     # Compute the filler strings
     phi = b''
-    for i in range(1,route_len):
-        min = (2*(p.r-i)+3)*p.k
-        phi = p.xor(phi + (b"\x00" * (2*p.k)),
-            p.rho(p.hrho(asbtuples[i-1]['s']))[min:])
+    for i in range(1, route_len):
+        min = (2 * (p.r - i) + 3) * p.k
+        phi = p.xor(phi + (b"\x00" * (2 * p.k)),
+                    p.rho(p.hrho(asbtuples[i - 1]['s']))[min:])
     # Compute the (beta, gamma) tuples
-    beta = dest + id + os.urandom(((2 * (p.r - route_len) + 2)*p.k - len(dest)))
+    beta = dest + id + os.urandom(((2 * (p.r - route_len) + 2) * p.k - len(dest)))
     beta = p.xor(beta,
-        p.rho(p.hrho(asbtuples[route_len-1]['s']))[:(2*(p.r-route_len)+3)*p.k]) + phi
-    gamma = p.mu(p.hmu(asbtuples[route_len-1]['s']), beta)
-    for i in range(route_len-2, -1, -1):
-        id = route[i+1]
+                 p.rho(p.hrho(asbtuples[route_len - 1]['s']))[:(2 * (p.r - route_len) + 3) * p.k]) + phi
+    gamma = p.mu(p.hmu(asbtuples[route_len - 1]['s']), beta)
+    for i in range(route_len - 2, -1, -1):
+        id = route[i + 1]
         assert len(id) == p.k
-        beta = p.xor(id + gamma + beta[:(2*p.r-1)*p.k],
-            p.rho(p.hrho(asbtuples[i]['s']))[:(2*p.r+1)*p.k])
+        beta = p.xor(id + gamma + beta[:(2 * p.r - 1) * p.k],
+                     p.rho(p.hrho(asbtuples[i]['s']))[:(2 * p.r + 1) * p.k])
         gamma = p.mu(p.hmu(asbtuples[i]['s']), beta)
     return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
+
 
 def create_forward_message(params, route, node_map, dest, msg):
     p = params
@@ -78,11 +80,12 @@ def create_forward_message(params, route, node_map, dest, msg):
     header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * p.k)
     body = pad_body(p.m, (b"\x00" * p.k) + bytes(destination_encode(dest)) + bytes(msg))
     # Compute the delta values
-    delta = p.pi(p.hpi(secrets[route_len-1]), body)
-    for i in range(route_len-2, -1, -1):
+    delta = p.pi(p.hpi(secrets[route_len - 1]), body)
+    for i in range(route_len - 2, -1, -1):
         delta = p.pi(p.hpi(secrets[i]), delta)
     alpha, beta, gamma = header
     return alpha, beta, gamma, delta
+
 
 def create_surb(params, route, node_map, dest):
     p = params
@@ -100,12 +103,15 @@ def create_surb(params, route, node_map, dest):
 class NymKeyNotFoundError(Exception):
     pass
 
+
 class CorruptMessageError(Exception):
     pass
+
 
 class ClientMessage:
     def __init__(self):
         self.payload = None
+
 
 class SphinxClient:
     def __init__(self, params, id=None):
@@ -133,11 +139,11 @@ class SphinxClient:
         p = self.params
         keytuple = self.keytable.pop(message_id, None)
 
-        if keytuple == None:
+        if keytuple is None:
             raise NymKeyNotFoundError
         ktilde = keytuple.pop(0)
         route_len = len(keytuple)
-        for i in range(route_len-1, -1, -1):
+        for i in range(route_len - 1, -1, -1):
             delta = p.pi(keytuple[i], delta)
         delta = p.pii(ktilde, delta)
 

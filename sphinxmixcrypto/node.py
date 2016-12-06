@@ -25,35 +25,44 @@ import os
 import re
 import binascii
 
+
 class HeaderAlphaGroupMismatchError(Exception):
     pass
+
 
 class ReplayError(Exception):
     pass
 
+
 class IncorrectMACError(Exception):
     pass
+
 
 class InvalidSpecialDestinationError(Exception):
     pass
 
+
 class NoSuchClientError(Exception):
     pass
+
 
 class InvalidMessageTypeError(Exception):
     pass
 
+
 class NoSURBSAvailableError(Exception):
     pass
+
 
 class KeyMismatchError(Exception):
     pass
 
+
 class BlockSizeMismatchError(Exception):
     pass
 
-# The special destination
-DSPEC = b"\x00"
+
+DSPEC = b"\x00"  # The special destination
 
 
 def pad_body(msgtotalsize, body):
@@ -81,6 +90,7 @@ def destination_encode(dest):
     assert len(dest) >= 1 and len(dest) <= 127
     return b"%c" % len(dest) + dest
 
+
 def generate_node_id(id_length, idnum):
     """
     generate a new node id
@@ -88,16 +98,19 @@ def generate_node_id(id_length, idnum):
     node_id = b"\xff" + idnum + (b"\x00" * (id_length - len(idnum) - 1))
     return node_id
 
+
 def generate_node_id_name(id_len):
     idnum = os.urandom(4)
     id = generate_node_id(id_len, idnum)
     name = "Node " + str(binascii.b2a_hex(idnum))
     return id, name
 
+
 def generate_node_keypair(group):
     private_key = group.gensecret()
     public_key = group.expon(group.generator, private_key)
     return public_key, private_key
+
 
 class UnwrappedMessage:
     def __init__(self):
@@ -105,12 +118,14 @@ class UnwrappedMessage:
         self.tuple_exit_hop = ()
         self.tuple_client_hop = ()
 
+
 class SphinxNodeState:
     def __init__(self):
         self.private_key = None
         self.public_key = None
         self.id = None
         self.name = None
+
 
 class SphinxNode:
     def __init__(self, params, state=None):
@@ -144,7 +159,7 @@ class SphinxNode:
         if l == 255:
             return 'node', s[:self.params.k], s[self.params.k:]
         if l < 128:
-            return 'dest', s[1:l+1], s[l+1:]
+            return 'dest', s[1:l + 1], s[l + 1:]
         return None, None, None
 
     def unwrap(self, header, payload):
@@ -173,8 +188,8 @@ class SphinxNode:
         if message_type == "node":
             b = p.hb(alpha, s)
             alpha = group.expon(alpha, b)
-            gamma = B[p.k:p.k*2]
-            beta = B[p.k*2:]
+            gamma = B[p.k:p.k * 2]
+            beta = B[p.k * 2:]
 
             # XXX this may raise KeyMismatchError or BlockSizeMismatchError
             payload = p.pii(p.hpi(s), payload)
@@ -195,7 +210,7 @@ class SphinxNode:
         elif message_type == "dest":
             id = rest[:p.k]
             payload = p.pii(p.hpi(s), payload)
-            if val in p.clients: # val is client-id
+            if val in p.clients:  # val is client-id
                 result.tuple_client_hop = (val, id, payload)
                 return result
             else:

@@ -5,7 +5,7 @@ import cbor
 
 from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import SphinxNode
-from sphinxmixcrypto.node import unpad_body, pad_body, ReplayError, BlockSizeMismatchError
+from sphinxmixcrypto.node import ReplayError, BlockSizeMismatchError
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 
 
@@ -14,11 +14,11 @@ class TestSphinxCorrectness(unittest.TestCase):
     def newTestRoute(self, numHops):
         self.r = numHops
         self.params = SphinxParams(
-            self.r, group_class = GroupECC,
-            hash_func = Blake2_hash,
-            hash_mac_func = Blake2_hash_mac,
-            lioness_class = Chacha_Lioness,
-            stream_cipher = Chacha20_stream_cipher,
+            self.r, group_class=GroupECC,
+            hash_func=Blake2_hash,
+            hash_mac_func=Blake2_hash_mac,
+            lioness_class=Chacha_Lioness,
+            stream_cipher=Chacha20_stream_cipher,
         )
         self.node_map = {}
         self.consensus = {}
@@ -55,6 +55,7 @@ class TestSphinxCorrectness(unittest.TestCase):
         result = self.node_map[route[0]].unwrap(header, payload)
         with self.assertRaises(ReplayError):
             result = self.node_map[route[0]].unwrap(header, payload)
+            assert result is not None
 
     def test_sphinx_assoc_data(self):
         route = self.newTestRoute(5)
@@ -63,25 +64,28 @@ class TestSphinxCorrectness(unittest.TestCase):
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message)
         header = alpha, beta, gamma
         payload = delta
+        assert payload is not None
         with self.assertRaises(BlockSizeMismatchError):
             result = self.node_map[route[0]].unwrap(header, b"somethingelse!!!!!!!!!!!!!!")
+            assert result is not None
+
 
 class TestSphinxECCGroup(unittest.TestCase):
 
     def setUp(self):
         self.r = 5
         self.params = SphinxParams(
-            self.r, group_class = GroupECC,
-            hash_func = Blake2_hash,
-            hash_mac_func = Blake2_hash_mac,
-            lioness_class = Chacha_Lioness,
-            stream_cipher = Chacha20_stream_cipher,
+            self.r, group_class=GroupECC,
+            hash_func=Blake2_hash,
+            hash_mac_func=Blake2_hash_mac,
+            lioness_class=Chacha_Lioness,
+            stream_cipher=Chacha20_stream_cipher,
         )
 
         self.node_map = {}
         self.consensus = {}
         # Create some nodes
-        for i in range(2*self.r):
+        for i in range(2 * self.r):
             node = SphinxNode(self.params)
             self.node_map[node.get_id()] = node
             self.consensus[node.get_id()] = node.public_key
@@ -109,8 +113,9 @@ class TestSphinxECCGroup(unittest.TestCase):
         received_client_message = self.mixnet_test_state_machine(nym_result.message_result)
 
         inner_message = cbor.loads(received_client_message)
-        assert inner_message.has_key('surb')
+        assert 'surb' in inner_message
         surb = inner_message['surb']
+        assert surb is not None
 
         # XXX todo: Bob's send message on his choosen route to -> mix proxy to SURB -> Alice
 
@@ -139,7 +144,6 @@ class TestSphinxECCGroup(unittest.TestCase):
         message = b"this is a test"
         alpha, beta, gamma, delta = create_forward_message(self.params, self.route, self.consensus, self.route[-1], message)
         header = alpha, beta, gamma
-        payload = delta
 
         # Send it to the first node for processing
         result = self.node_map[self.route[0]].unwrap(header, delta)

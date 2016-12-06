@@ -17,10 +17,10 @@ class TestNodeUtils(unittest.TestCase):
     def test_prefix_free_decode(self):
         self.r = 5
         self.params = SphinxParams(
-            self.r, group_class = GroupECC,
-            hash_func = Blake2_hash,
-            lioness_class = Chacha_Lioness,
-            stream_cipher = Chacha20_stream_cipher,
+            self.r, group_class=GroupECC,
+            hash_func=Blake2_hash,
+            lioness_class=Chacha_Lioness,
+            stream_cipher=Chacha20_stream_cipher,
         )
         node = SphinxNode(self.params)
         s = b""
@@ -44,8 +44,8 @@ class TestNodeUtils(unittest.TestCase):
         s = b"\x03" + b"\xFF" * 200
         message_type, val, rest = node._prefix_free_decode(s)
         self.failUnless(message_type == "dest")
-        self.failUnless(val == s[1:ord(s[0:1])+1])
-        self.failUnless(rest == s[ord(s[0:1])+1:])
+        self.failUnless(val == s[1:ord(s[0:1]) + 1])
+        self.failUnless(rest == s[ord(s[0:1]) + 1:])
 
         s = b"\xFE" + b"\xFF" * 200
         message_type, val, rest = node._prefix_free_decode(s)
