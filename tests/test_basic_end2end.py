@@ -3,7 +3,9 @@ import py.test
 import binascii
 import cbor
 
-from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
+from sphinxmixcrypto.params import SphinxParams
+from sphinxmixcrypto.params import GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
+from sphinxmixcrypto.params import GroupP, AES_Lioness, AES_stream_cipher, SHA256_hash, SHA256_hash_mac
 from sphinxmixcrypto import SphinxNode
 from sphinxmixcrypto.node import ReplayError, BlockSizeMismatchError
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
@@ -66,9 +68,32 @@ class TestSphinxCorrectness():
         py.test.raises(BlockSizeMismatchError, self.node_map[route[0]].unwrap, header, b"somethingelse!!!!!!!!!!!!!!")
 
 
-class TestSphinxECCGroup():
+class TestSphinxMix():
 
-    def setUp(self):
+    def setUpPParams(self):
+        self.r = 5
+        self.params = SphinxParams(
+            self.r, group_class=GroupP,
+            hash_func=SHA256_hash,
+            hash_mac_func=SHA256_hash_mac,
+            lioness_class=AES_Lioness,
+            stream_cipher=AES_stream_cipher,
+        )
+
+        self.node_map = {}
+        self.consensus = {}
+        # Create some nodes
+        for i in range(2 * self.r):
+            node = SphinxNode(self.params)
+            self.node_map[node.get_id()] = node
+            self.consensus[node.get_id()] = node.public_key
+
+        # Create a client
+        self.alice_client = SphinxClient(self.params)
+        # Pick a list of nodes to use
+        self.route = rand_subset(self.node_map.keys(), self.r)
+
+    def setUpECCParams(self):
         self.r = 5
         self.params = SphinxParams(
             self.r, group_class=GroupECC,
@@ -92,7 +117,7 @@ class TestSphinxECCGroup():
         self.route = rand_subset(self.node_map.keys(), self.r)
 
     def test_client_surb(self):
-        self.setUp()
+        self.setUpECCParams()
         self.bob_client = SphinxClient(self.params)
 
         route = rand_subset(self.node_map.keys(), self.r)
@@ -137,8 +162,15 @@ class TestSphinxECCGroup():
         print("send_to_mix")
         return self.node_map[destination].unwrap(header, payload)
 
-    def test_end_to_end(self):
-        self.setUp()
+    def test_end_to_end_ecc(self):
+        self.setUpECCParams()
+        self.end_to_end()
+
+    def test_end_to_end_p(self):
+        self.setUpPParams()
+        self.end_to_end()
+
+    def end_to_end(self):
         message = b"this is a test"
         alpha, beta, gamma, delta = create_forward_message(self.params, self.route, self.consensus, self.route[-1], message)
         header = alpha, beta, gamma
