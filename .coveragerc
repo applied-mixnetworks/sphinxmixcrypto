@@ -1,11 +1,16 @@
-[report]
-omit =
- */python?.?/*
- *__init__*
+[run]
+branch = True
+source = sphinxmixcrypto
+parallel = True
 
 [paths]
 source =
     sphinxmixcrypto
+   .tox/*/lib/python*/site-packages/sphinxmixcrypto
+   .tox/*/lib/site-packages/sphinxmixcrypto
+   .tox/pypy*/site-packages/sphinxmixcrypto
 
-[run]
-source = ./sphinxmixcrypto
+[report]
+omit =
+ */python?.?/*
+ *__init__*
