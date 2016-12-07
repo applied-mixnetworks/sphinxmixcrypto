@@ -1,5 +1,5 @@
 
-import unittest
+import py.test
 import binascii
 import cbor
 
@@ -9,7 +9,7 @@ from sphinxmixcrypto.node import ReplayError, BlockSizeMismatchError
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 
 
-class TestSphinxCorrectness(unittest.TestCase):
+class TestSphinxCorrectness():
 
     def newTestRoute(self, numHops):
         self.r = numHops
@@ -38,12 +38,12 @@ class TestSphinxCorrectness(unittest.TestCase):
         payload = delta
         print("after create forward message")
         result = self.node_map[route[0]].unwrap(header, payload)
-        self.failIf(len(result.tuple_exit_hop) == 0)
-        self.failIf(len(result.tuple_next_hop) != 0)
-        self.failIf(len(result.tuple_client_hop) != 0)
+        assert len(result.tuple_exit_hop) == 2
+        assert len(result.tuple_next_hop) == 0
+        assert len(result.tuple_client_hop) == 0
         received_dest, received_message = result.tuple_exit_hop
-        self.failUnless(received_dest, destination)
-        self.failUnless(received_message, message)
+        assert received_dest == destination
+        assert received_message == message
 
     def test_sphinx_replay(self):
         route = self.newTestRoute(5)
@@ -52,10 +52,8 @@ class TestSphinxCorrectness(unittest.TestCase):
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message)
         header = alpha, beta, gamma
         payload = delta
-        result = self.node_map[route[0]].unwrap(header, payload)
-        with self.assertRaises(ReplayError):
-            result = self.node_map[route[0]].unwrap(header, payload)
-            assert result is not None
+        self.node_map[route[0]].unwrap(header, payload)
+        py.test.raises(ReplayError, self.node_map[route[0]].unwrap, header, payload)
 
     def test_sphinx_assoc_data(self):
         route = self.newTestRoute(5)
@@ -65,12 +63,10 @@ class TestSphinxCorrectness(unittest.TestCase):
         header = alpha, beta, gamma
         payload = delta
         assert payload is not None
-        with self.assertRaises(BlockSizeMismatchError):
-            result = self.node_map[route[0]].unwrap(header, b"somethingelse!!!!!!!!!!!!!!")
-            assert result is not None
+        py.test.raises(BlockSizeMismatchError, self.node_map[route[0]].unwrap, header, b"somethingelse!!!!!!!!!!!!!!")
 
 
-class TestSphinxECCGroup(unittest.TestCase):
+class TestSphinxECCGroup():
 
     def setUp(self):
         self.r = 5
@@ -96,6 +92,7 @@ class TestSphinxECCGroup(unittest.TestCase):
         self.route = rand_subset(self.node_map.keys(), self.r)
 
     def test_client_surb(self):
+        self.setUp()
         self.bob_client = SphinxClient(self.params)
 
         route = rand_subset(self.node_map.keys(), self.r)
@@ -141,6 +138,7 @@ class TestSphinxECCGroup(unittest.TestCase):
         return self.node_map[destination].unwrap(header, payload)
 
     def test_end_to_end(self):
+        self.setUp()
         message = b"this is a test"
         alpha, beta, gamma, delta = create_forward_message(self.params, self.route, self.consensus, self.route[-1], message)
         header = alpha, beta, gamma
@@ -148,7 +146,7 @@ class TestSphinxECCGroup(unittest.TestCase):
         # Send it to the first node for processing
         result = self.node_map[self.route[0]].unwrap(header, delta)
         self.mixnet_test_state_machine(result)
-        self.failUnlessEqual(self.node_map[self.route[-1]].received[0], message)
+        assert self.node_map[self.route[-1]].received[0] == message
 
         # Create a reply block for the client
         reply_route = rand_subset(self.node_map.keys(), self.r)
