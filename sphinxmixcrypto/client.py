@@ -90,9 +90,17 @@ def create_forward_message(params, route, node_map, dest, msg, secret=None, padd
     assert p.k + 1 + len(dest) + len(msg) < p.m
     # Compute the header and the secrets
     header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * p.k, secret=secret, padding=padding)
-    body = add_padding((b"\x00" * p.k) + bytes(destination_encode(dest)) + bytes(msg), p.m)
+    encoded_dest = destination_encode(dest)
+    print "dest %s" % binascii.hexlify(dest)
+    print "encoded dest %s" % binascii.hexlify(encoded_dest)
+    body = (b"\x00" * p.k) + bytes(encoded_dest) + bytes(msg)
+    print "unpadded body %s\n" % binascii.hexlify(body)
+    padded_body = add_padding(body, p.m)
     # Compute the delta values
-    delta = p.pi(p.create_block_cipher_key(secrets[route_len - 1]), body)
+    key = p.create_block_cipher_key(secrets[route_len - 1])
+    delta = p.pi(key, padded_body)
+    print "padded body %s\n" % binascii.hexlify(padded_body)
+    #print "block cipher key %s\ndecrypted block %s\n" % (binascii.hexlify(key), binascii.hexlify(delta))
     for i in range(route_len - 2, -1, -1):
         delta = p.pi(p.create_block_cipher_key(secrets[i]), delta)
     alpha, beta, gamma = header
