@@ -13,7 +13,7 @@ def add_padding(src, block_size):
     offset = block_size - len(src)
     padding = b"\x00" * (offset - 2)
     offset_bytes = struct.pack('H', offset)
-    return src + padding + offset_bytes
+    return bytes(src) + bytes(padding) + bytes(offset_bytes)
 
 
 def remove_padding(src):

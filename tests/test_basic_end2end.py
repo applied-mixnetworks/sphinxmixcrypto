@@ -139,7 +139,7 @@ class TestSphinxEnd2End():
             'surb': reply_to_bob_surb,
         }
         message = cbor.dumps(inner_message)
-        print "size of serialized surb is %s" % len(message)
+        print("size of serialized surb is %s" % len(message))
         nym_result = self.params.nymserver.process(nym_id, message)
         received_client_message = self.mixnet_test_state_machine(nym_result.message_result)
 
