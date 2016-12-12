@@ -37,11 +37,11 @@ from sphinxmixcrypto.nym_server import Nymserver
 from sphinxmixcrypto.node import KeyMismatchError, BlockSizeMismatchError
 
 
-BLINDING_HASH_PREFIX = b'\0x11'
-RHO_HASH_PREFIX = b'\0x22'
-MU_HASH_PREFIX = b'\0x33'
-PI_HASH_PREFIX = b'\0x44'
-TAU_HASH_PREFIX = b'\0x55'
+BLINDING_HASH_PREFIX = b'\x11'
+RHO_HASH_PREFIX = b'\x22'
+MU_HASH_PREFIX = b'\x33'
+PI_HASH_PREFIX = b'\x44'
+TAU_HASH_PREFIX = b'\x55'
 
 
 class GroupECC:
@@ -96,27 +96,23 @@ class GroupECC:
 
 
 def Blake2_hash(data):
-    b = blake2b(data=bytes(data))
-    h = b.digest()
-    return h[:32]
-
+    b = blake2b(data=bytes(data), digest_size=32)
+    return b.digest()
 
 def Blake2_hash_mac(key, data, digest_size=16):
     b = blake2b(data=data, key=key, digest_size=digest_size)
     return b.digest()
 
-
 def Chacha20_stream_cipher(key):
-    b = blake2b(data=key)
-    new_key = b.digest()
-    return ChaCha20.new(key=new_key[8:40], nonce=new_key[0:8])
+    assert len(key) == 32
+    nonce = b"\x00" * 8 # it's OK to use zero nonce because we only use it once
+    return ChaCha20.new(key=key, nonce=nonce)
 
 
 class Chacha_Lioness:
     def __init__(self, key, block_size):
-        c = Chacha20_stream_cipher(key)
-        lioness_key = c.encrypt(b'\x00' * 208)
-        self.cipher = Chacha20_Blake2b_Lioness(lioness_key, block_size)
+        assert len(key) == 208
+        self.cipher = Chacha20_Blake2b_Lioness(key, block_size)
 
     def encrypt(self, block):
         return self.cipher.encrypt(block)
@@ -168,47 +164,61 @@ class SphinxParams:
         assert len(str1) == len(str2)
         return bytes(strxor(str1, str2))
 
-    # The PRG; key is of length k, output is of length (2r+3)k
+    # The PRG; key is 32 bytes, output is of length (2r+3)k
     def rho(self, key):
-        assert len(key) == self.k
+        assert len(key) == 32
         c = self.stream_cipher(key)
         return c.encrypt(b"\x00" * ((2 * self.r + 3) * self.k))
 
     # The HMAC; key is of length k, output is of length k
     def mu(self, key, data):
+        assert len(key) == self.k
         m = self.hash_mac_func(key, data)
         return m
 
     # The PRP; key is of length k, data is of length m
     def pi(self, key, data):
-        assert len(key) == self.k
-        assert len(data) == self.m
+        if len(key) != 208:
+            raise KeyMismatchError()
+        if len(data) != self.m:
+            raise BlockSizeMismatchError()
         return self.lioness_encrypt(key, data)
 
     # The inverse PRP; key is of length k, data is of length m
     def pii(self, key, data):
-        if len(key) != self.k:
+        print "key len %s" % len(key)
+        if len(key) != 208:
             raise KeyMismatchError()
         if len(data) != self.m:
             raise BlockSizeMismatchError()
-
         return self.lioness_decrypt(key, data)
 
     def hb(self, alpha, s):
         "Compute a hash of alpha and s to use as a blinding factor"
+        assert len(s) == 32
+        assert len(alpha) == 32
         return self.group.makeexp(self.hash_func(BLINDING_HASH_PREFIX + alpha + s))
 
-    def hrho(self, s):
-        "Compute a hash of s to use as a key for the PRG rho"
-        return (self.hash_func(RHO_HASH_PREFIX + s))[:self.k]
+    def create_stream_cipher_key(self, s):
+        assert len(s) == 32
+        hash = self.hash_func(PI_HASH_PREFIX + s)
+        assert len(hash) == 32
+        return hash
 
     def hmu(self, s):
         "Compute a hash of s to use as a key for the HMAC mu"
         return (self.hash_func(MU_HASH_PREFIX + s))[:self.k]
 
-    def hpi(self, s):
-        "Compute a hash of s to use as a key for the PRP pi"
-        return self.hash_func(PI_HASH_PREFIX + s)[:self.k]
+    def create_block_cipher_key(self, secret):
+        """
+        Compute a key cipher key using the secret
+        """
+        assert len(secret) == 32
+        stream_cipher_key = self.create_stream_cipher_key(secret)
+        c = self.stream_cipher(stream_cipher_key)
+        key = c.encrypt(b"\x00" * 208)
+        assert len(key) == 208
+        return key
 
     def htau(self, s):
         "Compute a hash of s to use to see if we've seen s before"

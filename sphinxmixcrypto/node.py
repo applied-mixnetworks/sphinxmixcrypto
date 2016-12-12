@@ -167,6 +167,7 @@ class SphinxNode:
         unwrap returns a UnwrappedMessage given a header and payload
         or raises an exception if an error was encountered
         """
+        print "UNWRAP"
         result = UnwrappedMessage()
         p = self.params
         group = p.group
@@ -183,8 +184,9 @@ class SphinxNode:
             raise IncorrectMACError()
 
         self.seen[tag] = 1
-        B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.hrho(s)))
+        B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.create_stream_cipher_key(s)))
         message_type, val, rest = self._prefix_free_decode(B)
+
         if message_type == "node":
             b = p.hb(alpha, s)
             alpha = group.expon(alpha, b)
@@ -192,12 +194,12 @@ class SphinxNode:
             beta = B[p.k * 2:]
 
             # XXX this may raise KeyMismatchError or BlockSizeMismatchError
-            payload = p.pii(p.hpi(s), payload)
+            payload = p.pii(p.create_block_cipher_key(s), payload)
 
             result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
             return result
         elif message_type == "Dspec":
-            payload = p.pii(p.hpi(s), payload)
+            payload = p.pii(p.create_block_cipher_key(s), payload)
             if payload[:p.k] == (b"\x00" * p.k):
                 inner_type, val, rest = self._prefix_free_decode(payload[p.k:])
                 if inner_type == "dest":
@@ -209,7 +211,7 @@ class SphinxNode:
             raise InvalidSpecialDestinationError()
         elif message_type == "dest":
             id = rest[:p.k]
-            payload = p.pii(p.hpi(s), payload)
+            payload = p.pii(p.create_block_cipher_key(s), payload)
             if val in p.clients:  # val is client-id
                 result.tuple_client_hop = (val, id, payload)
                 return result

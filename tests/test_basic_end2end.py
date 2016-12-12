@@ -5,7 +5,7 @@ import cbor
 
 from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import SphinxNode
-from sphinxmixcrypto.node import ReplayError, BlockSizeMismatchError
+from sphinxmixcrypto.node import ReplayError, BlockSizeMismatchError, SphinxNodeState
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 
 
@@ -66,9 +66,37 @@ class TestSphinxCorrectness():
         py.test.raises(BlockSizeMismatchError, self.node_map[route[0]].unwrap, header, b"somethingelse!!!!!!!!!!!!!!")
 
 
-class TestSphinxECCGroup():
+class TestSphinxEnd2End():
 
     def setUp(self):
+        hexedState = [
+            {
+            "id": binascii.unhexlify("ff2182654d0000000000000000000000"),
+            "public_key": binascii.unhexlify("d7314c8d2ba771dbe2982fa6299844f1b92736881e78ae7644f4bccbf8817a69"),
+            "private_key": binascii.unhexlify("306e5a009897d4e134727037f9b275294bd01fb33c0c7dbe5f1fdaed765d0c47"),
+            },
+            {
+                "id": binascii.unhexlify("ff0f9a62780000000000000000000000"),
+                "public_key": binascii.unhexlify("5ce56657b8af66bd47df2469b10065206a2fd777a0cd17b104160256810bc976"),
+                "private_key": binascii.unhexlify("98967364dfe5d5f5d0180c727797d9111f3b1da573c25036ba16396579c25048"),
+            },
+            {
+                "id": binascii.unhexlify("ffc74d10550000000000000000000000"),
+                "public_key": binascii.unhexlify("47ade5905376604cde0b57e732936b4298281c8a67b6a62c6107482eb69e2941"),
+                "private_key": binascii.unhexlify("18c539194baae419f50ff117cbf15456a0762845af3d0a77ba85024ba488ce58"),
+            },
+            {
+                "id": binascii.unhexlify("ffbb0407380000000000000000000000"),
+                "public_key": binascii.unhexlify("4704aff4bc2aaaa3fd187d52913a203aba4e19f6e7b491bda8c8e67daa8daa67"),
+                "private_key": binascii.unhexlify("781e6fc7636d70dae8ebf2337538b22d7b64281a55505c1f12921e7b61f09c59"),
+            },
+            {
+                "id": binascii.unhexlify("ff81855a360000000000000000000000"),
+                "public_key": binascii.unhexlify("73514173ee741afacdd4733e84f629b5cb9e34d28d072d749a8171fc6d64a930"),
+                "private_key": binascii.unhexlify("9863a8f1b5307938cd4bc9782411e9eea0a38b9144d096bd923085dfb8534277"),
+            },
+
+        ]
         self.r = 5
         self.params = SphinxParams(
             self.r, group_class=GroupECC,
@@ -80,16 +108,21 @@ class TestSphinxECCGroup():
 
         self.node_map = {}
         self.consensus = {}
+        self.route = []
+
         # Create some nodes
-        for i in range(2 * self.r):
-            node = SphinxNode(self.params)
+        for i in range(len(hexedState)):
+            state = SphinxNodeState()
+            state.id = hexedState[i]['id']
+            state.public_key = hexedState[i]['public_key']
+            state.private_key = hexedState[i]['private_key']
+            node = SphinxNode(self.params, state=state)
+            self.route.append(node.id)
             self.node_map[node.get_id()] = node
             self.consensus[node.get_id()] = node.public_key
 
         # Create a client
-        self.alice_client = SphinxClient(self.params)
-        # Pick a list of nodes to use
-        self.route = rand_subset(self.node_map.keys(), self.r)
+        self.alice_client = SphinxClient(self.params, id=binascii.unhexlify("436c69656e74206564343564326264"))
 
     def test_client_surb(self):
         self.setUp()
@@ -106,6 +139,7 @@ class TestSphinxECCGroup():
             'surb': reply_to_bob_surb,
         }
         message = cbor.dumps(inner_message)
+        print "size of serialized surb is %s" % len(message)
         nym_result = self.params.nymserver.process(nym_id, message)
         received_client_message = self.mixnet_test_state_machine(nym_result.message_result)
 
@@ -139,24 +173,13 @@ class TestSphinxECCGroup():
 
     def test_end_to_end(self):
         self.setUp()
-        message = b"this is a test"
-        alpha, beta, gamma, delta = create_forward_message(self.params, self.route, self.consensus, self.route[-1], message)
+        message = b"the quick brown fox"
+        secret = binascii.unhexlify("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b4")
+        alpha, beta, gamma, delta = create_forward_message(self.params, self.route, self.consensus,
+                                                           self.route[-1], message, secret=secret)
         header = alpha, beta, gamma
 
         # Send it to the first node for processing
         result = self.node_map[self.route[0]].unwrap(header, delta)
         self.mixnet_test_state_machine(result)
         assert self.node_map[self.route[-1]].received[0] == message
-
-        # Create a reply block for the client
-        reply_route = rand_subset(self.node_map.keys(), self.r)
-        nym = b"cypherpunk"
-        nym_tuple = self.alice_client.create_nym(reply_route, self.consensus)
-        self.params.nymserver.add_surb(nym, nym_tuple)
-
-        # Send a message to it
-        reply_message = b"this is a reply"
-        nym_id = b"cypherpunk"
-        print("Nymserver received message for [%s]" % nym_id)
-        nym_result = self.params.nymserver.process(nym_id, reply_message)
-        self.mixnet_test_state_machine(nym_result.message_result)
