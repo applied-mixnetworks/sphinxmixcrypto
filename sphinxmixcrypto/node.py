@@ -146,13 +146,11 @@ class SphinxNode:
             return 'dest', s[1:l + 1], s[l + 1:]
         return None, None, None
 
-    def unwrap(self, header, payload):
+    def unwrap(self, header, delta):
         """
         unwrap returns a UnwrappedMessage given a header and payload
         or raises an exception if an error was encountered
         """
-        print "UNWRAP"
-        #print "delta %s" % binascii.hexlify(payload)
         result = UnwrappedMessage()
         p = self.params
         group = p.group
@@ -169,7 +167,7 @@ class SphinxNode:
             raise IncorrectMACError()
         self.seen[tag] = 1
 
-        payload = p.pii(p.create_block_cipher_key(s), payload)
+        payload = p.pii(p.create_block_cipher_key(s), delta)
         B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.create_stream_cipher_key(s)))
         message_type, val, rest = self._prefix_free_decode(B)
 

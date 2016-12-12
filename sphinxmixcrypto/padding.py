@@ -11,11 +11,8 @@ def add_padding(src, block_size):
     assert len(src) != 0
     assert len(src) < block_size - 2
     offset = block_size - len(src)
-    print "padding offset %s" % offset
     padding = b"\x00" * (offset - 2)
     offset_bytes = struct.pack('H', offset)
-    import binascii
-    print "offset_bytes %s" % binascii.hexlify(offset_bytes)
     return src + padding + offset_bytes
 
 def remove_padding(src):
