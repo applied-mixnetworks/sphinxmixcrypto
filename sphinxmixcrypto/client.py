@@ -19,7 +19,8 @@
 
 import os
 import binascii
-from sphinxmixcrypto.node import destination_encode, DSPEC, pad_body, unpad_body
+from sphinxmixcrypto.node import destination_encode, DSPEC
+from sphinxmixcrypto.padding import add_padding, remove_padding
 
 
 def rand_subset(lst, nu):
@@ -59,7 +60,7 @@ def create_header(params, route, node_map, dest, id, secret=None, padding=None):
         b = p.hb(alpha, s)
         blinds.append(b)
         asbtuples.append({'alpha': alpha, 's': s, 'b': b})
-# XXX
+
     # Compute the filler strings
     phi = b''
     for i in range(1, route_len):
@@ -67,17 +68,12 @@ def create_header(params, route, node_map, dest, id, secret=None, padding=None):
         phi = p.xor(phi + (b"\x00" * (2 * p.k)),
                     p.rho(p.create_stream_cipher_key(asbtuples[i - 1]['s']))[min:])
 
-    print "phi %s" % binascii.hexlify(phi)
     # Compute the (beta, gamma) tuples
     beta = dest + id + padding
-    print "dest type %s dest id %s padding %s" % (binascii.hexlify(dest), binascii.hexlify(id), binascii.hexlify(padding))
     beta = p.xor(beta,
                  p.rho(p.create_stream_cipher_key(asbtuples[route_len - 1]['s']))[:(2 * (p.r - route_len) + 3) * p.k]) + phi
-    print "hopSharedSecret %s" % binascii.hexlify(asbtuples[route_len - 1]['s'])
     gamma_key = p.hmu(asbtuples[route_len - 1]['s'])
-    print "gamma_key %s" % binascii.hexlify(gamma_key)
     gamma = p.mu(gamma_key, beta)
-    print "beta %s\ngamma %s" % (binascii.hexlify(beta), binascii.hexlify(gamma))
     for i in range(route_len - 2, -1, -1):
         id = route[i + 1]
         assert len(id) == p.k
@@ -94,7 +90,7 @@ def create_forward_message(params, route, node_map, dest, msg, secret=None, padd
     assert p.k + 1 + len(dest) + len(msg) < p.m
     # Compute the header and the secrets
     header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * p.k, secret=secret, padding=padding)
-    body = pad_body(p.m, (b"\x00" * p.k) + bytes(destination_encode(dest)) + bytes(msg))
+    body = add_padding((b"\x00" * p.k) + bytes(destination_encode(dest)) + bytes(msg), p.m)
     # Compute the delta values
     delta = p.pi(p.create_block_cipher_key(secrets[route_len - 1]), body)
     for i in range(route_len - 2, -1, -1):
@@ -164,7 +160,7 @@ class SphinxClient:
         delta = p.pii(p.create_block_cipher_key(ktilde), delta)
 
         if delta[:p.k] == (b"\x00" * p.k):
-            msg = unpad_body(delta[p.k:])
+            msg = remove_padding(delta[p.k:])
             message.tuple_message = (self.id, msg)
             return message
 

@@ -17,7 +17,8 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-from sphinxmixcrypto.node import pad_body, UnwrappedMessage
+from sphinxmixcrypto.node import UnwrappedMessage
+from sphinxmixcrypto.padding import add_padding
 
 
 class SphinxNoSURBSAvailableError(Exception):
@@ -47,7 +48,7 @@ class Nymserver:
         db = self.database
         if nym in db and len(db[nym]) > 0:
             n0, header0, ktilde = db[nym].pop(0)
-            body = p.pi(p.create_block_cipher_key(ktilde), pad_body(p.m, (b"\x00" * p.k) + message))
+            body = p.pi(p.create_block_cipher_key(ktilde), add_padding((b"\x00" * p.k) + message, p.m))
             unwrapped_message = UnwrappedMessage()
             unwrapped_message.tuple_next_hop = (n0, header0, body)
             result.message_result = unwrapped_message

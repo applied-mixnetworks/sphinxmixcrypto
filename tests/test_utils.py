@@ -2,15 +2,6 @@
 
 from sphinxmixcrypto import SphinxNode
 from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash
-from sphinxmixcrypto.node import unpad_body, pad_body
-
-
-def test_pad_unpad():
-    message = b"hello world"
-    paded = pad_body(200, message)
-    assert len(paded) == 200
-    orig = unpad_body(paded)
-    assert message == orig
 
 
 def test_prefix_free_decode():

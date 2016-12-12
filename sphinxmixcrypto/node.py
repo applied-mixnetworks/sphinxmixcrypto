@@ -25,6 +25,8 @@ import os
 import re
 import binascii
 
+from sphinxmixcrypto.padding import remove_padding
+
 
 class HeaderAlphaGroupMismatchError(Exception):
     pass
@@ -63,24 +65,6 @@ class BlockSizeMismatchError(Exception):
 
 
 DSPEC = b"\x00"  # The special destination
-
-
-def pad_body(msgtotalsize, body):
-    """
-    pad_body appends padding to the body of a message.
-    Given the total size and the message data a new
-    padded message is returned.
-    """
-    body = bytes(body) + b"\x7f"
-    body = body + (b"\xff" * (msgtotalsize - len(body)))
-    return body
-
-
-def unpad_body(body):
-    """
-    unpad_body performs the inverse of pad_body
-    """
-    return re.compile(b"\x7f\xff*$").sub(b"", body)
 
 
 def destination_encode(dest):
@@ -168,6 +152,7 @@ class SphinxNode:
         or raises an exception if an error was encountered
         """
         print "UNWRAP"
+        #print "delta %s" % binascii.hexlify(payload)
         result = UnwrappedMessage()
         p = self.params
         group = p.group
@@ -182,8 +167,9 @@ class SphinxNode:
             raise ReplayError()
         if gamma != p.mu(p.hmu(s), beta):
             raise IncorrectMACError()
-
         self.seen[tag] = 1
+
+        payload = p.pii(p.create_block_cipher_key(s), payload)
         B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.create_stream_cipher_key(s)))
         message_type, val, rest = self._prefix_free_decode(B)
 
@@ -192,26 +178,20 @@ class SphinxNode:
             alpha = group.expon(alpha, b)
             gamma = B[p.k:p.k * 2]
             beta = B[p.k * 2:]
-
-            # XXX this may raise KeyMismatchError or BlockSizeMismatchError
-            payload = p.pii(p.create_block_cipher_key(s), payload)
-
             result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
             return result
         elif message_type == "Dspec":
-            payload = p.pii(p.create_block_cipher_key(s), payload)
             if payload[:p.k] == (b"\x00" * p.k):
                 inner_type, val, rest = self._prefix_free_decode(payload[p.k:])
                 if inner_type == "dest":
                     # We're to deliver rest (unpadded) to val
-                    body = unpad_body(rest)
+                    body = remove_padding(rest)
                     self.received.append(body)
                     result.tuple_exit_hop = (val, body)
                     return result
             raise InvalidSpecialDestinationError()
         elif message_type == "dest":
             id = rest[:p.k]
-            payload = p.pii(p.create_block_cipher_key(s), payload)
             if val in p.clients:  # val is client-id
                 result.tuple_client_hop = (val, id, payload)
                 return result
