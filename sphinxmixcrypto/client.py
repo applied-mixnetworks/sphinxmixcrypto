@@ -34,12 +34,16 @@ def rand_subset(lst, nu):
     return [x[1] for x in nodeids[:nu]]
 
 
-def create_header(params, route, node_map, dest, id, secret=None):
-    p = params
+def create_header(params, route, node_map, dest, id, secret=None, padding=None):
     route_len = len(route)
-    assert route_len <= p.r
-    assert len(id) == p.k
-    assert len(dest) <= 2 * (p.r - route_len + 1) * p.k
+    assert len(dest) <= 2 * (params.r - route_len + 1) * params.k
+    assert route_len <= params.r
+    assert len(id) == params.k
+    if padding is None:
+        padding = os.urandom(((2 * (params.r - route_len) + 2) * params.k - len(dest)))
+    else:
+        assert len(padding) == ((2 * (params.r - route_len) + 2) * params.k - len(dest))
+    p = params
     group = p.group
     if secret is None:
         x = group.gensecret()
@@ -62,11 +66,18 @@ def create_header(params, route, node_map, dest, id, secret=None):
         min = (2 * (p.r - i) + 3) * p.k
         phi = p.xor(phi + (b"\x00" * (2 * p.k)),
                     p.rho(p.create_stream_cipher_key(asbtuples[i - 1]['s']))[min:])
+
+    print "phi %s" % binascii.hexlify(phi)
     # Compute the (beta, gamma) tuples
-    beta = dest + id + os.urandom(((2 * (p.r - route_len) + 2) * p.k - len(dest)))
+    beta = dest + id + padding
+    print "dest type %s dest id %s padding %s" % (binascii.hexlify(dest), binascii.hexlify(id), binascii.hexlify(padding))
     beta = p.xor(beta,
                  p.rho(p.create_stream_cipher_key(asbtuples[route_len - 1]['s']))[:(2 * (p.r - route_len) + 3) * p.k]) + phi
-    gamma = p.mu(p.hmu(asbtuples[route_len - 1]['s']), beta)
+    print "hopSharedSecret %s" % binascii.hexlify(asbtuples[route_len - 1]['s'])
+    gamma_key = p.hmu(asbtuples[route_len - 1]['s'])
+    print "gamma_key %s" % binascii.hexlify(gamma_key)
+    gamma = p.mu(gamma_key, beta)
+    print "beta %s\ngamma %s" % (binascii.hexlify(beta), binascii.hexlify(gamma))
     for i in range(route_len - 2, -1, -1):
         id = route[i + 1]
         assert len(id) == p.k
@@ -76,13 +87,13 @@ def create_header(params, route, node_map, dest, id, secret=None):
     return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
 
 
-def create_forward_message(params, route, node_map, dest, msg, secret=None):
+def create_forward_message(params, route, node_map, dest, msg, secret=None, padding=None):
     p = params
     route_len = len(route)
     assert len(dest) < 128 and len(dest) > 0
     assert p.k + 1 + len(dest) + len(msg) < p.m
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * p.k, secret=secret)
+    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * p.k, secret=secret, padding=padding)
     body = pad_body(p.m, (b"\x00" * p.k) + bytes(destination_encode(dest)) + bytes(msg))
     # Compute the delta values
     delta = p.pi(p.create_block_cipher_key(secrets[route_len - 1]), body)
@@ -149,7 +160,6 @@ class SphinxClient:
         ktilde = keytuple.pop(0)
         route_len = len(keytuple)
         for i in range(route_len - 1, -1, -1):
-            print "i %s keytuple len %s" % (i, len(keytuple[i]))
             delta = p.pi(keytuple[i], delta)
         delta = p.pii(p.create_block_cipher_key(ktilde), delta)
 

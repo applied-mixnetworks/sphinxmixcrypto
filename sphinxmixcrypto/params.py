@@ -186,7 +186,6 @@ class SphinxParams:
 
     # The inverse PRP; key is of length k, data is of length m
     def pii(self, key, data):
-        print "key len %s" % len(key)
         if len(key) != 208:
             raise KeyMismatchError()
         if len(data) != self.m:
@@ -201,9 +200,7 @@ class SphinxParams:
 
     def create_stream_cipher_key(self, s):
         assert len(s) == 32
-        hash = self.hash_func(PI_HASH_PREFIX + s)
-        assert len(hash) == 32
-        return hash
+        return self.hash_func(RHO_HASH_PREFIX + s)
 
     def hmu(self, s):
         "Compute a hash of s to use as a key for the HMAC mu"

@@ -2,6 +2,7 @@
 import py.test
 import binascii
 import cbor
+import os
 
 from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import SphinxNode
@@ -153,7 +154,6 @@ class TestSphinxEnd2End():
     def mixnet_test_state_machine(self, result):
         while True:
             if result.tuple_next_hop:
-                print("result.tuple_next_hop")
                 result = self.send_to_mix(result.tuple_next_hop[0], result.tuple_next_hop[1], result.tuple_next_hop[2])
             elif result.tuple_exit_hop:
                 print("Deliver [%s] to [%s]" % (result.tuple_exit_hop[1], binascii.hexlify(result.tuple_exit_hop[0])))
@@ -168,15 +168,18 @@ class TestSphinxEnd2End():
         return self.params.clients[client_id].decrypt(message_id, delta)
 
     def send_to_mix(self, destination, header, payload):
-        print("send_to_mix")
         return self.node_map[destination].unwrap(header, payload)
 
     def test_end_to_end(self):
         self.setUp()
         message = b"the quick brown fox"
         secret = binascii.unhexlify("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b4")
+        route_len = 5
+        dest_len = 1
+        padding = binascii.unhexlify("3c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
+
         alpha, beta, gamma, delta = create_forward_message(self.params, self.route, self.consensus,
-                                                           self.route[-1], message, secret=secret)
+                                                           self.route[-1], message, secret=secret, padding=padding)
         header = alpha, beta, gamma
 
         # Send it to the first node for processing
