@@ -2,7 +2,6 @@
 import py.test
 import binascii
 import cbor
-import os
 
 from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import SphinxNode
@@ -72,9 +71,9 @@ class TestSphinxEnd2End():
     def setUp(self):
         hexedState = [
             {
-            "id": binascii.unhexlify("ff2182654d0000000000000000000000"),
-            "public_key": binascii.unhexlify("d7314c8d2ba771dbe2982fa6299844f1b92736881e78ae7644f4bccbf8817a69"),
-            "private_key": binascii.unhexlify("306e5a009897d4e134727037f9b275294bd01fb33c0c7dbe5f1fdaed765d0c47"),
+                "id": binascii.unhexlify("ff2182654d0000000000000000000000"),
+                "public_key": binascii.unhexlify("d7314c8d2ba771dbe2982fa6299844f1b92736881e78ae7644f4bccbf8817a69"),
+                "private_key": binascii.unhexlify("306e5a009897d4e134727037f9b275294bd01fb33c0c7dbe5f1fdaed765d0c47"),
             },
             {
                 "id": binascii.unhexlify("ff0f9a62780000000000000000000000"),
@@ -174,8 +173,6 @@ class TestSphinxEnd2End():
         self.setUp()
         message = b"the quick brown fox"
         secret = binascii.unhexlify("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b4")
-        route_len = 5
-        dest_len = 1
         padding = binascii.unhexlify("3c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
 
         alpha, beta, gamma, delta = create_forward_message(self.params, self.route, self.consensus,

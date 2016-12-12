@@ -15,6 +15,7 @@ def add_padding(src, block_size):
     offset_bytes = struct.pack('H', offset)
     return src + padding + offset_bytes
 
+
 def remove_padding(src):
     """
     remove_padding removes the message padding

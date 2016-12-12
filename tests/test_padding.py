@@ -3,6 +3,7 @@ import binascii
 
 from sphinxmixcrypto.padding import add_padding, remove_padding
 
+
 def test_add_padding():
     message = "the quick brown fox"
     padded = add_padding(message, 100)

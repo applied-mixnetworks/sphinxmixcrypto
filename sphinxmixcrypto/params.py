@@ -99,13 +99,15 @@ def Blake2_hash(data):
     b = blake2b(data=bytes(data), digest_size=32)
     return b.digest()
 
+
 def Blake2_hash_mac(key, data, digest_size=16):
     b = blake2b(data=data, key=key, digest_size=digest_size)
     return b.digest()
 
+
 def Chacha20_stream_cipher(key):
     assert len(key) == 32
-    nonce = b"\x00" * 8 # it's OK to use zero nonce because we only use it once
+    nonce = b"\x00" * 8  # it's OK to use zero nonce because we only use it once
     return ChaCha20.new(key=key, nonce=nonce)
 
 

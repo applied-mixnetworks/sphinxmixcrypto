@@ -22,7 +22,6 @@ This SphinxNode module includes cryptographic algorithms for mix net nodes
 """
 
 import os
-import re
 import binascii
 
 from sphinxmixcrypto.padding import remove_padding
