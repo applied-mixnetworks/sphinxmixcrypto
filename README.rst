@@ -1,5 +1,6 @@
-README
-======
+
+sphinx mix network crypto for python
+====================================
 
 .. image:: https://travis-ci.org/david415/sphinxmixcrypto.png?branch=master
     :target: https://www.travis-ci.org/david415/sphinxmixcrypto/
@@ -14,25 +15,26 @@ README
 sphinxmixcrypto
 ---------------
 
-sphinxmixcrypto is a python crpyto library for writing mixnets.
-The code was forked from Ian Goldberg's reference implementation
-of Sphinx from 2011.
-
 Read the Sphinx paper:
 
 **Sphinx: A Compact and Provably Secure Mix Format**
-http://www0.cs.ucl.ac.uk/staff/G.Danezis/papers/sphinx-eprint.pdf
+by Ian Goldberg and George Danezis
 
-This library intentionally does not have any networking code.
-It is a crypto library. You can look at the unit tests to see
-how a Sphinx Node state-machine is built.
+- http://www0.cs.ucl.ac.uk/staff/G.Danezis/papers/sphinx-eprint.pdf
 
-This library allows you to make parameterized sphinx packets,
-with the crypto primitives of your choosing. The unit tests
-currently demonstrate use of more modern crypto primitives
-than the original Sphinx reference implementation, such as:
-Chacha20 for the stream cipher and a new Lioness implementation
-using Chacha20 + Blake2.
+
+This is a crypto library for writing mix networks.
+The code was forked from Ian Goldberg's reference implementation.
+
+
+status
+------
+
+This crypto library is binary compatible with the golang sphinx crypto library:
+
+- https://github.com/david415/go-sphinxmixcrypto
+
+Both projects contain the same unit test vectors, this proves binary compatiblity.
 
 
 install
@@ -40,8 +42,10 @@ install
 
 You should install into a python virtual env.
 
-I've replaced the LIONESS implementation with my own:
-https://github.com/david415/pylioness
+Install pylioness from here:
+
+- https://github.com/david415/pylioness
+
 
 You can install it like this::
 
