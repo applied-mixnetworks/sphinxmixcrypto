@@ -19,6 +19,7 @@
 
 import os
 import binascii
+
 from sphinxmixcrypto.node import destination_encode, DSPEC
 from sphinxmixcrypto.padding import add_padding, remove_padding
 
@@ -109,6 +110,10 @@ def create_surb(params, route, node_map, dest):
     # Compute the header and the secrets
     header, secrets = create_header(params, route, node_map, destination_encode(dest), id)
 
+    # ktilde is 32 bytes because our create_block_cipher_key
+    # requires a 32 byte input. However in the Sphinx reference
+    # implementation the block cipher key creator function called "hpi"
+    # allows any size input. ktilde was previously 16 bytes.
     ktilde = os.urandom(32)
     keytuple = [ktilde]
     keytuple.extend([p.create_block_cipher_key(x) for x in secrets])
