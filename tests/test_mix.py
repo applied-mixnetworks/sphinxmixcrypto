@@ -55,7 +55,6 @@ class TestSphinxCorrectness():
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
         header = alpha, beta, gamma
         payload = delta
-        print("after create forward message")
         result = self.node_map[route[0]].unwrap(header, payload)
         assert len(result.tuple_exit_hop) == 2
         assert len(result.tuple_next_hop) == 0
@@ -89,7 +88,7 @@ class TestSphinxCorrectness():
 
 class TestSphinxEnd2End():
 
-    def setUpMixVectors(self, rand_reader):
+    def setUpMixVectors(self, rand_reader, client_id=None):
         hexedState = [
             {
                 "id": binascii.unhexlify("ff2182654d0000000000000000000000"),
@@ -144,27 +143,22 @@ class TestSphinxEnd2End():
 
         # Create a client
         self.alice_client = SphinxClient(self.params,
-                                         id=binascii.unhexlify("436c69656e74206564343564326264"),
+                                         id=client_id,
                                          rand_reader=rand_reader)
 
     def test_client_surb(self):
         rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
 
         self.setUpMixVectors(rand_reader)
-        self.bob_client = SphinxClient(self.params, rand_reader=rand_reader)
-
         nym_id = b"Cypherpunk"
         nym_tuple = self.alice_client.create_nym(self.route, self.consensus)
-        # ktilde = nym_tuple[2]
-        # print("\n\nsurb ktilde %s" % binascii.hexlify(ktilde))
-
         self.params.nymserver.add_surb(nym_id, nym_tuple)
-
         message = b"Open, secure and reliable connectivity is necessary (although not sufficient) to excercise the human rights such as freedom of expression and freedom of association [FOC], as defined in the Universal Declaration of Human Rights [UDHR]."
+
         nym_result = self.params.nymserver.process(nym_id, message)
         self.alpha = binascii.unhexlify("934db5e1a2f61630ecf65bdc4ea2b675094f6cd67f42fa078b0e1f9d7b0e9869")
-        self.beta = binascii.unhexlify("4434e7c327107cc10ef6ce50d2ddc424619c742480c9fba53777344e54d0bc5ef1b041954e785f8dfaf30679e6164c7e7b6b96e1d9e2b403bf89b5cd86447cdf7c78c977e972797683180543500745f9e41509ee1c81b044ca010ba1ff83cd42617fcf61ddcc6aed5ccb0953a963be342f95eaa53209a4774b01d45134f02e068ad044b56c12b2725b72648329f10048839beef11cb7d43c218cbb3a89fbf2685fa8550074ae8a3005f32500d117a6e8")
-        self.gamma = binascii.unhexlify("489f6525eb5f2e2195f46a9f02fded3f")
+        self.beta = binascii.unhexlify("4434e7c327107cc10ef6ce50d2ddc42442828c2762c20f0694d1a3fcfedf5c6cf1b041954e785f8dfda20679b3401c7f7b6b96e1d9e2b403bf89b5cd86447cdf7c78c977e972797683180543500745f9e41509ee1c81b044ca010ba1ff83cd42617fcf61ddcc6aed5ccb0953a963be342f95eaa53209a4774b01d45134f02e068ad044b56c12b2725b72648329f10048839beef11cb7d43c218cbb3a89fbf2685fa8550074ae8a3005f32500d117a6e8")
+        self.gamma = binascii.unhexlify("0b97b75871d7a12e834676c2c1bb239a")
         self.delta = binascii.unhexlify("3fa91c6d899921ae72a8becf7c655112b39836b0332546280c33e01437fb415ba457506ee67c8935eb6ec727c098b30cfb558b1c0706e2b0eb5f24903b9fda6bc4535d5a15a5705813ca7d9a4859b0a30ae98736c577d89e7c6e6d29a489c350b45d6eb34d9103ff6a9b73a94e6f3a479e78fddeba98ab7865817e0d619209c610c9580a3f703fa01b3ff115cc21a3b4bfc8fa0c3d94e070f088941763f209ec4ddd8efc93876483637ab9f21f57367e1e804b59fa816777fc040f28c6adc06d6a5cc90143619be7145b4cd9050d8d9b448822bf9726321b70dc836168cf375ff9d5cbbc8eac1fabe739ac744e95ba54cbc958142b2e3d21d2b626a26447a81478c179ad36d859fe8a9b116e94e442fe1a510e6bb60b49aba8467d9d53a71bea8a5ea592a6d13e9309fe3537d3ce0be39ef5918ea6861edd9c15e7b90aa915b89a17b60f93405e31f0b72a186ab0f2f52e32d3c91b33183e1abf7284b4750c6da972e67f81a6235a0b4102e2110e01afd69558a9f95f9c1204058c02a9a1b2a96bed0ea98321e810f3ad23c70941f10cdbaeaa2fd3f42ee63c0c8b8cab794a463855eca69412508689fd33309d82abed06392393519be01b42d59f94dc68be7dc7a63800495ebc4d3fdf9583b28b1738189feed525ec8e092ea2f6501155ef5ae3d9dd97c670eb749c1482e2d0975ba25de3ea0cd2ac2dab4b61919892054da15bc6b208dfac47e9fec78cde3b606ebfa52a331d2285d43105ea5af707e69233b26184e5de737f51a8b045a1b572fbe5e6c6b540e73023cb7b33aa1f6e46d706ffae6fbfabd2f138517bc6bfffd98ebd5250c25114620b83541eae168fa21d3795fa2805b2deaf9916b543e4d77433ed0a669f1f146fafee8a328c7834677562b56de66bf1a7f3c64a76ff825503d4ba96f367a6225a3494785dc1987cc9d563f2bb1ddaa7914be824698bc13ce2e078acc892bf6cec26dffaa24a499ba769aa8caec1e0238328cdd0da25b64719cf6aa8fe74fa25ab59ec92ed8572d8d6de623cf3fbafbac783eeece653f525bf36471f541e39bfcacb4d46e006fda5aa332d5061186dbe0c06c02aabf1aa8c1515feb64cfeb0c1560f89589e0680893c863708628be2df9ad087d5c81b36daace21d6050d3a469285e5eac09d74523bc766a2ff0919f66868938f9da5897b563e5b11eace3bfdd407a6c0246b42e041d2263d9a140cd703e2f96ee26d227f1d5078e2820eaf97f9ca6efbf160734ad02e1cb0d44f266ee8d7374ceddee72920937826f68e17af5ee4882d2c4c66b14941d3416a673d6a487eb40132d928ddf313b9b5c9604fea2e91b32ba26b10b0eaf2031ec0b5825717eb8cbbeb2f71790331134ed30e5122acf7df8cd62e6cbe53237acf13f517c8925c8fd868155fc8d5b0bf6cf73937e9a8a9ca1f5966207a9b4d98e")
         result = self.mixnet_test_state_machine(nym_result.message_result)
         received_client_message = result.tuple_message[1]
@@ -176,10 +170,6 @@ class TestSphinxEnd2End():
             if result.tuple_next_hop:
                 result = self.send_to_mix(result.tuple_next_hop[0], result.tuple_next_hop[1], result.tuple_next_hop[2])
                 if self.route[i] == binascii.unhexlify("ffc74d10550000000000000000000000"):
-                    # print "alpha %s" % binascii.hexlify(result.tuple_next_hop[1][0])
-                    # print "beta %s" % binascii.hexlify(result.tuple_next_hop[1][1])
-                    # print "gamma %s" % binascii.hexlify(result.tuple_next_hop[1][2])
-                    # print "delta %s" % binascii.hexlify(result.tuple_next_hop[2])
                     assert result.tuple_next_hop[1][0] == self.alpha
                     assert result.tuple_next_hop[1][1] == self.beta
                     assert result.tuple_next_hop[1][2] == self.gamma
@@ -202,7 +192,7 @@ class TestSphinxEnd2End():
 
     def test_end_to_end(self):
         rand_reader = FixedNoiseReader("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b43c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
-        self.setUpMixVectors(rand_reader)
+        self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
         message = b"the quick brown fox"
         alpha, beta, gamma, delta = create_forward_message(self.params, self.route, self.consensus,
                                                            self.route[-1], message, rand_reader)

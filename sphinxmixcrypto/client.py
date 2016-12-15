@@ -37,11 +37,11 @@ def rand_subset(lst, nu):
     return [x[1] for x in nodeids[:nu]]
 
 
-def create_header(params, route, node_map, dest, id, rand_reader):
+def create_header(params, route, node_map, dest, message_id, rand_reader):
     route_len = len(route)
     assert len(dest) <= 2 * (params.r - route_len + 1) * params.k
     assert route_len <= params.r
-    assert len(id) == params.k
+    assert len(message_id) == params.k
     p = params
     group = p.group
     x = group.gensecret(rand_reader)
@@ -65,15 +65,15 @@ def create_header(params, route, node_map, dest, id, rand_reader):
                     p.rho(p.create_stream_cipher_key(asbtuples[i - 1]['s']))[min:])
 
     # Compute the (beta, gamma) tuples
-    beta = dest + id + padding
+    beta = dest + message_id + padding
     beta = p.xor(beta,
                  p.rho(p.create_stream_cipher_key(asbtuples[route_len - 1]['s']))[:(2 * (p.r - route_len) + 3) * p.k]) + phi
     gamma_key = p.hmu(asbtuples[route_len - 1]['s'])
     gamma = p.mu(gamma_key, beta)
     for i in range(route_len - 2, -1, -1):
-        id = route[i + 1]
-        assert len(id) == p.k
-        beta = p.xor(id + gamma + beta[:(2 * p.r - 1) * p.k],
+        message_id = route[i + 1]
+        assert len(message_id) == p.k
+        beta = p.xor(message_id + gamma + beta[:(2 * p.r - 1) * p.k],
                      p.rho(p.create_stream_cipher_key(asbtuples[i]['s']))[:(2 * p.r + 1) * p.k])
         gamma = p.mu(p.hmu(asbtuples[i]['s']), beta)
     return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
@@ -100,10 +100,10 @@ def create_forward_message(params, route, node_map, dest, msg, rand_reader):
 
 def create_surb(params, route, node_map, dest, rand_reader):
     p = params
-    id = rand_reader.read(p.k)
+    message_id = rand_reader.read(p.k)
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, node_map, destination_encode(dest), id, rand_reader)
+    header, secrets = create_header(params, route, node_map, destination_encode(dest), message_id, rand_reader)
 
     # ktilde is 32 bytes because our create_block_cipher_key
     # requires a 32 byte input. However in the Sphinx reference
@@ -112,7 +112,7 @@ def create_surb(params, route, node_map, dest, rand_reader):
     ktilde = rand_reader.read(32)
     keytuple = [ktilde]
     keytuple.extend([p.create_block_cipher_key(x) for x in secrets])
-    return id, keytuple, (route[0], header, ktilde)
+    return message_id, keytuple, (route[0], header, ktilde)
 
 
 class NymKeyNotFoundError(Exception):
