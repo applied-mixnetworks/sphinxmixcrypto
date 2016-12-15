@@ -23,7 +23,6 @@ This module is used to parameterize the crypto primitives
 used to encrypt/decrypt sphinx mixnet packets.
 """
 
-import os
 from functools import reduce
 
 from Crypto.Util.strxor import strxor
@@ -75,8 +74,8 @@ class GroupECC:
         curve_out[31] |= 64
         return bytes(bytearray(curve_out))
 
-    def gensecret(self):
-        return self.makesecret(os.urandom(self.size))
+    def gensecret(self, randReader):
+        return self.makesecret(randReader.read(self.size))
 
     def expon(self, base, exp):
         return crypto_scalarmult(bytes(exp), bytes(base))

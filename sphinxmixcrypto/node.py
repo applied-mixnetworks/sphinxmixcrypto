@@ -21,7 +21,6 @@
 This SphinxNode module includes cryptographic algorithms for mix net nodes
 """
 
-import os
 import binascii
 
 from sphinxmixcrypto.padding import remove_padding
@@ -82,15 +81,15 @@ def generate_node_id(id_length, idnum):
     return node_id
 
 
-def generate_node_id_name(id_len):
-    idnum = os.urandom(4)
+def generate_node_id_name(id_len, rand_reader):
+    idnum = rand_reader.read(4)
     id = generate_node_id(id_len, idnum)
     name = "Node " + str(binascii.b2a_hex(idnum))
     return id, name
 
 
-def generate_node_keypair(group):
-    private_key = group.gensecret()
+def generate_node_keypair(group, rand_reader):
+    private_key = group.gensecret(rand_reader)
     public_key = group.expon(group.generator, private_key)
     return public_key, private_key
 
@@ -111,11 +110,12 @@ class SphinxNodeState:
 
 
 class SphinxNode:
-    def __init__(self, params, state=None):
+    def __init__(self, params, state=None, rand_reader=None):
         self.params = params
         if state is None:
-            self.public_key, self.private_key = generate_node_keypair(self.params.group)
-            self.id, self.name = generate_node_id_name(self.params.k)
+            assert rand_reader is not None
+            self.public_key, self.private_key = generate_node_keypair(self.params.group, rand_reader)
+            self.id, self.name = generate_node_id_name(self.params.k, rand_reader)
         else:
             assert isinstance(state, SphinxNodeState)
             self.private_key = state.private_key

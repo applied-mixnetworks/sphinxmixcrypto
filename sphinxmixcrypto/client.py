@@ -22,6 +22,7 @@ import binascii
 
 from sphinxmixcrypto.node import destination_encode, DSPEC
 from sphinxmixcrypto.padding import add_padding, remove_padding
+from sphinxmixcrypto.common import RandReader
 
 
 def rand_subset(lst, nu):
@@ -36,21 +37,15 @@ def rand_subset(lst, nu):
     return [x[1] for x in nodeids[:nu]]
 
 
-def create_header(params, route, node_map, dest, id, secret=None, padding=None):
+def create_header(params, route, node_map, dest, id, rand_reader):
     route_len = len(route)
     assert len(dest) <= 2 * (params.r - route_len + 1) * params.k
     assert route_len <= params.r
     assert len(id) == params.k
-    if padding is None:
-        padding = os.urandom(((2 * (params.r - route_len) + 2) * params.k - len(dest)))
-    else:
-        assert len(padding) == ((2 * (params.r - route_len) + 2) * params.k - len(dest))
     p = params
     group = p.group
-    if secret is None:
-        x = group.gensecret()
-    else:
-        x = group.makesecret(secret)
+    x = group.gensecret(rand_reader)
+    padding = rand_reader.read(((2 * (params.r - route_len) + 2) * params.k - len(dest)))
 
     # Compute the (alpha, s, b) tuples
     blinds = [x]
@@ -84,13 +79,13 @@ def create_header(params, route, node_map, dest, id, secret=None, padding=None):
     return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
 
 
-def create_forward_message(params, route, node_map, dest, msg, secret=None, padding=None):
+def create_forward_message(params, route, node_map, dest, msg, rand_reader):
     p = params
     route_len = len(route)
     assert len(dest) < 128 and len(dest) > 0
     assert p.k + 1 + len(dest) + len(msg) < p.m
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * p.k, secret=secret, padding=padding)
+    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * p.k, rand_reader)
     encoded_dest = destination_encode(dest)
     body = (b"\x00" * p.k) + bytes(encoded_dest) + bytes(msg)
     padded_body = add_padding(body, p.m)
@@ -103,18 +98,18 @@ def create_forward_message(params, route, node_map, dest, msg, secret=None, padd
     return alpha, beta, gamma, delta
 
 
-def create_surb(params, route, node_map, dest):
+def create_surb(params, route, node_map, dest, rand_reader):
     p = params
-    id = os.urandom(p.k)
+    id = rand_reader.read(p.k)
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, node_map, destination_encode(dest), id)
+    header, secrets = create_header(params, route, node_map, destination_encode(dest), id, rand_reader)
 
     # ktilde is 32 bytes because our create_block_cipher_key
     # requires a 32 byte input. However in the Sphinx reference
     # implementation the block cipher key creator function called "hpi"
     # allows any size input. ktilde was previously 16 bytes.
-    ktilde = os.urandom(32)
+    ktilde = rand_reader.read(32)
     keytuple = [ktilde]
     keytuple.extend([p.create_block_cipher_key(x) for x in secrets])
     return id, keytuple, (route[0], header, ktilde)
@@ -134,10 +129,14 @@ class ClientMessage:
 
 
 class SphinxClient:
-    def __init__(self, params, id=None):
+    def __init__(self, params, id=None, rand_reader=None):
         self.params = params
+        if rand_reader is None:
+            self.rand_reader = RandReader()
+        else:
+            self.rand_reader = rand_reader
         if id is None:
-            self.id = b"Client " + bytes(str(binascii.hexlify(os.urandom(4))).encode("utf-8"))
+            self.id = b"Client " + bytes(str(binascii.hexlify(self.rand_reader.read(4))).encode("utf-8"))
         else:
             self.id = id
         params.clients[self.id] = self
@@ -147,7 +146,7 @@ class SphinxClient:
         """Create a SURB for the given nym (passing through nllength
         nodes), and send it to the nymserver."""
 
-        message_id, keytuple, nymtuple = create_surb(self.params, route, node_map, self.id)
+        message_id, keytuple, nymtuple = create_surb(self.params, route, node_map, self.id, self.rand_reader)
         self.keytable[message_id] = keytuple
         return nymtuple
 
