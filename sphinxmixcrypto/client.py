@@ -136,7 +136,7 @@ class SphinxClient:
         else:
             self.rand_reader = rand_reader
         if id is None:
-            self.id = b"Client " + bytes(str(binascii.hexlify(self.rand_reader.read(4))).encode("utf-8"))
+            self.id = b"Client %s" % binascii.hexlify(self.rand_reader.read(4))
         else:
             self.id = id
         params.clients[self.id] = self
