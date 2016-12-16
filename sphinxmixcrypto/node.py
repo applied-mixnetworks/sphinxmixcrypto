@@ -154,18 +154,15 @@ class SphinxNode:
         p = self.params
         group = p.group
         alpha, beta, gamma = header
-
         if not group.in_group(alpha):
             raise HeaderAlphaGroupMismatchError()
         s = group.expon(alpha, self.private_key)
         tag = p.htau(s)
-
         if tag in self.seen:
             raise ReplayError()
         if gamma != p.mu(p.hmu(s), beta):
             raise IncorrectMACError()
         self.seen[tag] = 1
-
         payload = p.pii(p.create_block_cipher_key(s), delta)
         B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.create_stream_cipher_key(s)))
         message_type, val, rest = self._prefix_free_decode(B)

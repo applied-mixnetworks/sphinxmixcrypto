@@ -89,6 +89,7 @@ def create_forward_message(params, route, node_map, dest, msg, rand_reader):
     encoded_dest = destination_encode(dest)
     body = (b"\x00" * p.k) + bytes(encoded_dest) + bytes(msg)
     padded_body = add_padding(body, p.m)
+
     # Compute the delta values
     key = p.create_block_cipher_key(secrets[route_len - 1])
     delta = p.pi(key, padded_body)
