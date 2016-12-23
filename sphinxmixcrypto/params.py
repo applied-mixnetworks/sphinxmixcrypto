@@ -112,7 +112,7 @@ def Chacha20_stream_cipher(key):
 
 class Chacha_Lioness:
     def __init__(self, key, block_size):
-        assert len(key) == 208
+        assert len(key) == Chacha20_Blake2b_Lioness.KEY_LEN
         self.cipher = Chacha20_Blake2b_Lioness(key, block_size)
 
     def encrypt(self, block):
@@ -179,7 +179,7 @@ class SphinxParams:
 
     # The PRP; key is of length k, data is of length m
     def pi(self, key, data):
-        if len(key) != 208:
+        if len(key) != Chacha20_Blake2b_Lioness.KEY_LEN:
             raise KeyMismatchError()
         if len(data) != self.m:
             raise BlockSizeMismatchError()
@@ -187,7 +187,7 @@ class SphinxParams:
 
     # The inverse PRP; key is of length k, data is of length m
     def pii(self, key, data):
-        if len(key) != 208:
+        if len(key) != Chacha20_Blake2b_Lioness.KEY_LEN:
             raise KeyMismatchError()
         if len(data) != self.m:
             raise BlockSizeMismatchError()
@@ -214,8 +214,8 @@ class SphinxParams:
         assert len(secret) == 32
         stream_cipher_key = self.create_stream_cipher_key(secret)
         c = self.stream_cipher(stream_cipher_key)
-        key = c.encrypt(b"\x00" * 208)
-        assert len(key) == 208
+        key = c.encrypt(b"\x00" * Chacha20_Blake2b_Lioness.KEY_LEN)
+        assert len(key) == Chacha20_Blake2b_Lioness.KEY_LEN
         return key
 
     def htau(self, s):

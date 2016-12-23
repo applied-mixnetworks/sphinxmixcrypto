@@ -2,6 +2,7 @@
 import binascii
 
 from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
+from pylioness.lioness import Chacha20_Blake2b_Lioness
 
 
 def test_eccgroup():
@@ -39,8 +40,8 @@ def test_create_block_cipher_key():
     )
     alpha = binascii.unhexlify("56f7f7946e62a79f2a4440cc5ca459a9d1b080c5972014c782230fa38cfe8277")
     key = params.create_block_cipher_key(alpha)
-    assert len(key) == 208
-    want = binascii.unhexlify("8c8efb9ab5606f3ba6c4c2ec57f4c751147088dbab36fd464a561668472830480b409b9c0b3b4e64ab1f5542959fc24ca4b87c4927fd95eba14c541b18c59770fb0503288dd033f6c82542ad83618af3efa9ac6962892774b9c139832e307f5df711f505b5992fa09553259827769ba913fd36038ab15b753056124b9631e76729d36f313a321161cf2d1e3373e7985c23477613625b49fcdec292528aff7c0033d1668aec65c2c4b39573408437399921e553004240db08fa3c2b2599e280f79a8082613d67d8c17ed9cf7afaf108cf")
+    assert len(key) == Chacha20_Blake2b_Lioness.KEY_LEN
+    want = binascii.unhexlify("8c8efb9ab5606f3ba6c4c2ec57f4c751147088dbab36fd464a561668472830480b409b9c0b3b4e64ab1f5542959fc24ca4b87c4927fd95eba14c541b18c59770fb0503288dd033f6c82542ad83618af3efa9ac6962892774b9c139832e307f5df711f505b5992fa09553259827769ba913fd36038ab15b753056124b9631e76729d36f313a321161cf2d1e3373e7985c23477613625b49fcdec292528aff7c0033d1668aec65c2c4b39573408437399921e553004240db08fa3c2b2599e280f7")
     assert key == want
 
 
