@@ -59,6 +59,7 @@ def test_create_stream_cipher_key():
     want = binascii.unhexlify("44cbf1428c9e7f6915cb923e55e0835cfcf778822abbf323dee0fa4c76dde986")
     assert key == want
 
+
 def test_derive_hmac_key():
     params = SphinxParams(
         5, group_class=GroupECC,
