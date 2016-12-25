@@ -11,6 +11,12 @@ sphinx mix network crypto for python
     :alt: coveralls
 
 
+Warning
+=======
+This code has not been formally audited by a cryptographer. It therefore should not
+be considered safe or correct. Use it at your own risk! (however test vectors are verified using
+other language implementations: rust, golang, python trinity!)
+
 
 sphinxmixcrypto
 ---------------
