@@ -2,12 +2,12 @@
 sphinx mix network crypto for python
 ====================================
 
-.. image:: https://travis-ci.org/david415/sphinxmixcrypto.png?branch=master
-    :target: https://www.travis-ci.org/david415/sphinxmixcrypto/
+.. image:: https://travis-ci.org/applied-mixnetworks/sphinxmixcrypto.png?branch=master
+    :target: https://www.travis-ci.org/applied-mixnetworks/sphinxmixcrypto/
     :alt: travis
 
-.. image:: https://coveralls.io/repos/github/david415/sphinxmixcrypto/badge.svg
-    :target: https://coveralls.io/github/david415/sphinxmixcrypto
+.. image:: https://coveralls.io/repos/github/applied-mixnetworks/sphinxmixcrypto/badge.svg
+    :target: https://coveralls.io/github/applied-mixnetworks/sphinxmixcrypto
     :alt: coveralls
 
 
@@ -38,7 +38,7 @@ status
 
 This crypto library is binary compatible with the golang sphinx crypto library:
 
-- https://github.com/david415/go-sphinxmixcrypto
+- https://github.com/applied-mixnetworks/go-sphinxmixcrypto
 
 Both projects contain the same unit test vectors, this proves binary compatiblity.
 
@@ -50,13 +50,13 @@ You should install into a python virtual env.
 
 Install pylioness from here:
 
-- https://github.com/david415/pylioness
+- https://github.com/applied-mixnetworks/pylioness
 
 
 You can install it like this::
 
-  pip install git+https://github.com/david415/pylioness.git
+  pip install git+https://github.com/applied-mixnetworks/pylioness.git
 
 and then install this package::
 
-  pip install git+https://github.com/david415/sphinxmixcrypto.git
+  pip install git+https://github.com/applied-mixnetworks/sphinxmixcrypto.git
