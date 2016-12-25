@@ -58,3 +58,22 @@ def test_create_stream_cipher_key():
     assert len(key) == 32
     want = binascii.unhexlify("44cbf1428c9e7f6915cb923e55e0835cfcf778822abbf323dee0fa4c76dde986")
     assert key == want
+
+def test_derive_hmac_key():
+    params = SphinxParams(
+        5, group_class=GroupECC,
+        hash_func=Blake2_hash,
+        hash_mac_func=Blake2_hash_mac,
+        lioness_class=Chacha_Lioness,
+        stream_cipher=Chacha20_stream_cipher,
+    )
+    secret = binascii.unhexlify("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b4")
+    key = params.hmu(secret)
+    assert len(key) == 16
+    want_key = binascii.unhexlify("eba2ad216a65c5230ad2018b4c536c45")
+    assert key == want_key
+
+    data = binascii.unhexlify("4171bd9a48a58cf7579e9fa662fe0ac2acb8c6eed3056cd970fd35dd4d026cae")
+    want_mac = binascii.unhexlify("77724528a77692be295f07bcfc8bd5eb")
+    mac = params.mu(key, data)
+    assert mac == want_mac

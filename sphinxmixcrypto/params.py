@@ -205,7 +205,10 @@ class SphinxParams:
 
     def hmu(self, s):
         "Compute a hash of s to use as a key for the HMAC mu"
-        return (self.hash_func(MU_HASH_PREFIX + s))[:self.k]
+        b = blake2b(digest_size=16)
+        b.update(MU_HASH_PREFIX)
+        b.update(s)
+        return b.digest()
 
     def create_block_cipher_key(self, secret):
         """
