@@ -14,8 +14,7 @@ sphinx mix network crypto for python
 Warning
 =======
 This code has not been formally audited by a cryptographer. It therefore should not
-be considered safe or correct. Use it at your own risk! (however test vectors are verified using
-other language implementations: rust, golang, python trinity!)
+be considered safe or correct. Use it at your own risk!
 
 
 sphinxmixcrypto
@@ -40,7 +39,7 @@ This crypto library is binary compatible with the golang sphinx crypto library:
 
 - https://github.com/applied-mixnetworks/go-sphinxmixcrypto
 
-Both projects contain the same unit test vectors, this proves binary compatiblity.
+Both projects contain the same unit test vectors.
 
 
 install
