@@ -1,12 +1,12 @@
 
 import binascii
 
-from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
+from sphinxmixcrypto.params import SphinxParams, GroupCurve25519, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
 from pylioness.lioness import Chacha20_Blake2b_Lioness
 
 
 def test_eccgroup():
-    g = GroupECC()
+    g = GroupCurve25519()
     secret = binascii.unhexlify("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b4")
     x = g.makesecret(secret)
     blinds = [x]
@@ -17,7 +17,7 @@ def test_eccgroup():
 
 def test_blinding_hash():
     params = SphinxParams(
-        5, group_class=GroupECC,
+        5, group_class=GroupCurve25519,
         hash_func=Blake2_hash,
         hash_mac_func=Blake2_hash_mac,
         lioness_class=Chacha_Lioness,
@@ -32,7 +32,7 @@ def test_blinding_hash():
 
 def test_create_block_cipher_key():
     params = SphinxParams(
-        5, group_class=GroupECC,
+        5, group_class=GroupCurve25519,
         hash_func=Blake2_hash,
         hash_mac_func=Blake2_hash_mac,
         lioness_class=Chacha_Lioness,
@@ -47,7 +47,7 @@ def test_create_block_cipher_key():
 
 def test_create_stream_cipher_key():
     params = SphinxParams(
-        5, group_class=GroupECC,
+        5, group_class=GroupCurve25519,
         hash_func=Blake2_hash,
         hash_mac_func=Blake2_hash_mac,
         lioness_class=Chacha_Lioness,
@@ -62,7 +62,7 @@ def test_create_stream_cipher_key():
 
 def test_derive_hmac_key():
     params = SphinxParams(
-        5, group_class=GroupECC,
+        5, group_class=GroupCurve25519,
         hash_func=Blake2_hash,
         hash_mac_func=Blake2_hash_mac,
         lioness_class=Chacha_Lioness,

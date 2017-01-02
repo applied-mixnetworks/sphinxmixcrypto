@@ -43,7 +43,7 @@ PI_HASH_PREFIX = b'\x44'
 TAU_HASH_PREFIX = b'\x55'
 
 
-class GroupECC:
+class GroupCurve25519:
     "Group operations in curve25519"
     size = 32
 

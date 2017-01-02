@@ -2,7 +2,7 @@
 import py.test
 import binascii
 
-from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
+from sphinxmixcrypto.params import SphinxParams, GroupCurve25519, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket, generate_node_keypair, generate_node_id_name
 from sphinxmixcrypto.node import PacketReplayCacheDict, ReplayError, BlockSizeMismatchError, SphinxNodeState
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
@@ -31,7 +31,7 @@ class TestSphinxCorrectness():
     def newTestRoute(self, numHops):
         self.r = numHops
         self.params = SphinxParams(
-            self.r, group_class=GroupECC,
+            self.r, group_class=GroupCurve25519,
             hash_func=Blake2_hash,
             hash_mac_func=Blake2_hash_mac,
             lioness_class=Chacha_Lioness,
@@ -74,6 +74,7 @@ class TestSphinxCorrectness():
         packet = SphinxPacket(alpha, beta, gamma, delta)
         sphinx_packet_unwrap(self.params, self.node_map[route[0]], packet)
         py.test.raises(ReplayError, sphinx_packet_unwrap, self.params, self.node_map[route[0]], packet)
+        self.node_map[route[0]].replay_cache.flush()
 
     def test_sphinx_assoc_data(self):
         route = self.newTestRoute(5)
@@ -118,7 +119,7 @@ class TestSphinxEnd2End():
         ]
         self.r = 5
         self.params = SphinxParams(
-            self.r, group_class=GroupECC,
+            self.r, group_class=GroupCurve25519,
             hash_func=Blake2_hash,
             hash_mac_func=Blake2_hash_mac,
             lioness_class=Chacha_Lioness,
