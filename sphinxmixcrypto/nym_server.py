@@ -18,6 +18,7 @@
 
 from sphinxmixcrypto.node import UnwrappedMessage
 from sphinxmixcrypto.padding import add_padding
+from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxDigest, PAYLOAD_SIZE, SECURITY_PARAMETER
 
 
 class SphinxNoSURBSAvailableError(Exception):
@@ -30,9 +31,10 @@ class NymResult:
 
 
 class Nymserver:
-    def __init__(self, params):
-        self.params = params
+    def __init__(self):
         self.database = {}
+        self.digest = SphinxDigest()
+        self.block_cipher = SphinxLioness()
 
     def add_surb(self, nym, nymtuple):
         db = self.database
@@ -43,11 +45,12 @@ class Nymserver:
 
     def process(self, nym, message):
         result = NymResult()
-        p = self.params
         db = self.database
         if nym in db and len(db[nym]) > 0:
             n0, header0, ktilde = db[nym].pop(0)
-            body = p.pi(p.create_block_cipher_key(ktilde), add_padding((b"\x00" * p.k) + message, p.m))
+            key = self.block_cipher.create_block_cipher_key(ktilde)
+            block = add_padding((b"\x00" * SECURITY_PARAMETER) + message, PAYLOAD_SIZE)
+            body = self.block_cipher.encrypt(key, block)
             unwrapped_message = UnwrappedMessage()
             unwrapped_message.tuple_next_hop = (n0, header0, body)
             result.message_result = unwrapped_message

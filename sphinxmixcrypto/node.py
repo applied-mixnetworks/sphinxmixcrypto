@@ -27,10 +27,8 @@ import zope.interface
 
 from sphinxmixcrypto.padding import remove_padding
 from sphinxmixcrypto.common import IPacketReplayCache, ISphinxNodeState
-
-
-# Sphinx provides 128 bits of security as does curve25519
-SECURITY_PARAMETER = 16
+from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, GroupCurve25519, SphinxDigest, PAYLOAD_SIZE
+from sphinxmixcrypto.crypto_primitives import SphinxStreamCipher, SphinxLioness, xor
 
 
 class HeaderAlphaGroupMismatchError(Exception):
@@ -49,10 +47,6 @@ class InvalidProcessDestinationError(Exception):
     pass
 
 
-class NoSuchClientError(Exception):
-    pass
-
-
 class InvalidMessageTypeError(Exception):
     pass
 
@@ -65,7 +59,7 @@ class KeyMismatchError(Exception):
     pass
 
 
-class BlockSizeMismatchError(Exception):
+class SphinxBodySizeMismatchError(Exception):
     pass
 
 
@@ -113,7 +107,8 @@ def generate_node_id_name(id_len, rand_reader):
     return id, name
 
 
-def generate_node_keypair(group, rand_reader):
+def generate_node_keypair(rand_reader):
+    group = GroupCurve25519()
     private_key = group.gensecret(rand_reader)
     public_key = group.expon(group.generator, private_key)
     return public_key, private_key
@@ -161,31 +156,37 @@ class PacketReplayCacheDict:
         self.cache = {}
 
 
-def sphinx_packet_unwrap(params, node_state, packet):
+def sphinx_packet_unwrap(node_state, packet):
     """
-    unwrap returns a UnwrappedMessage given a header and payload
-    or raises an exception if an error was encountered
+    sphinx_packet_unwrap returns a UnwrappedMessage given a node_state
+    and a packet or raises an exception if an error was encountered,
+    where the node_state provides the ISphinxNodeState interface and
+    the packet is an instance of SphinxPacket.
     """
 
     assert ISphinxNodeState.providedBy(node_state)
+    if len(packet.delta) != PAYLOAD_SIZE:
+        raise SphinxBodySizeMismatchError()
     result = UnwrappedMessage()
-    p = params
-    group = p.group
+    group = GroupCurve25519()
+    digest = SphinxDigest()
+    stream_cipher = SphinxStreamCipher()
+    block_cipher = SphinxLioness()
     if not group.in_group(packet.alpha):
         raise HeaderAlphaGroupMismatchError()
     s = group.expon(packet.alpha, node_state.private_key)
-    tag = p.htau(s)
+    tag = digest.hash_replay(s)
     if node_state.replay_cache.has_seen(tag):
         raise ReplayError()
-    if packet.gamma != p.mu(p.hmu(s), packet.beta):
+    if packet.gamma != digest.hmac(digest.create_hmac_key(s), packet.beta):
         raise IncorrectMACError()
     node_state.replay_cache.set_seen(tag)
-    payload = p.pii(p.create_block_cipher_key(s), packet.delta)
-    B = p.xor(packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), p.rho(p.create_stream_cipher_key(s)))
+    payload = block_cipher.decrypt(block_cipher.create_block_cipher_key(s), packet.delta)
+    B = xor(packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s)))
     message_type, val, rest = prefix_free_decode(B)
 
     if message_type == "mix":
-        b = p.hb(packet.alpha, s)
+        b = digest.hash_blinding(packet.alpha, s)
         alpha = group.expon(packet.alpha, b)
         gamma = B[SECURITY_PARAMETER:SECURITY_PARAMETER * 2]
         beta = B[SECURITY_PARAMETER * 2:]
@@ -202,9 +203,6 @@ def sphinx_packet_unwrap(params, node_state, packet):
         raise InvalidProcessDestinationError()
     elif message_type == "client":
         id = rest[:SECURITY_PARAMETER]
-        if val in p.clients:  # val is client-id
-            result.tuple_client_hop = (val, id, payload)
-            return result
-        else:
-            raise NoSuchClientError()
+        result.tuple_client_hop = (val, id, payload)
+        return result
     raise InvalidMessageTypeError()

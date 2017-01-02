@@ -23,24 +23,34 @@ used to encrypt/decrypt sphinx mixnet packets.
 """
 
 from functools import reduce
-
 from Crypto.Util.strxor import strxor
 from nacl.bindings import crypto_scalarmult
 from pyblake2 import blake2b
 from Cryptodome.Cipher import ChaCha20
-
 from pylioness import Chacha20_Blake2b_Lioness
 
-from sphinxmixcrypto.nym_server import Nymserver
-from sphinxmixcrypto.node import BlockSizeMismatchError, SECURITY_PARAMETER
 
-
+# prefixes which are prefixed to data before hashing
 BLINDING_HASH_PREFIX = b'\x11'
-RHO_HASH_PREFIX = b'\x22'
-MU_HASH_PREFIX = b'\x33'
-PI_HASH_PREFIX = b'\x44'
-TAU_HASH_PREFIX = b'\x55'
+STREAM_CIPHER_HASH_PREFIX = b'\x22'
+HMAC_HASH_PREFIX = b'\x33'
+BLOCK_CIPHER_HASH_PREFIX = b'\x44'
+REPLAY_HASH_PREFIX = b'\x55'
+
+# Sphinx provides 128 bits of security as does curve25519
+SECURITY_PARAMETER = 16
+
+# the packet payload size
 PAYLOAD_SIZE = 1024  # XXX change me
+
+# maximum number of hops
+MAX_HOPS = 5  # XXX change me
+
+
+def xor(str1, str2):
+    # XOR two strings
+    assert len(str1) == len(str2)
+    return bytes(strxor(str1, str2))
 
 
 class GroupCurve25519:
@@ -48,7 +58,6 @@ class GroupCurve25519:
     size = 32
 
     def __init__(self):
-
         self.generator = self.basepoint()
 
     def basepoint(self):
@@ -94,115 +103,80 @@ class GroupCurve25519:
         return len(alpha) == self.size
 
 
-def Blake2_hash(data):
-    b = blake2b(data=bytes(data), digest_size=32)
-    return b.digest()
-
-
-def Blake2_hash_mac(key, data, digest_size=16):
-    b = blake2b(data=data, key=key, digest_size=digest_size)
-    return b.digest()
-
-
-def Chacha20_stream_cipher(key):
-    assert len(key) == 32
-    nonce = b"\x00" * 8  # it's OK to use zero nonce because we only use it once
-    return ChaCha20.new(key=key, nonce=nonce)
-
-
-class Chacha_Lioness:
-    def __init__(self, key, block_size):
-        assert len(key) == Chacha20_Blake2b_Lioness.KEY_LEN
-        self.cipher = Chacha20_Blake2b_Lioness(key, block_size)
-
-    def encrypt(self, block):
-        return self.cipher.encrypt(block)
-
-    def decrypt(self, block):
-        return self.cipher.decrypt(block)
-
-
-class SphinxParams:
-    k = 16  # in bytes, == 128 bits
-    m = 1024  # size of message body, in bytes
-    clients = {}  # mapping of destinations to clients
-
-    def __init__(self, path_len=5, group_class=None, lioness_class=None,
-                 hash_func=None, hash_mac_func=None, stream_cipher=None):
-        self.r = path_len
-        assert group_class is not None
-        self.group = group_class()
-        self.lioness_class = lioness_class
-        self.hash_func = hash_func
-        self.hash_mac_func = hash_mac_func
-        self.stream_cipher = stream_cipher
-        self.nymserver = Nymserver(self)
-
-    def lioness_encrypt(self, key, data):
-        c = self.lioness_class(key, len(data))
-        return c.encrypt(data)
-
-    def lioness_decrypt(self, key, data):
-        c = self.lioness_class(key, len(data))
-        return c.decrypt(data)
-
-    def xor(self, str1, str2):
-        # XOR two strings
-        assert len(str1) == len(str2)
-        return bytes(strxor(str1, str2))
-
-    # The PRG; key is 32 bytes, output is of length (2r+3)k
-    def rho(self, key):
-        assert len(key) == 32
-        c = self.stream_cipher(key)
-        return c.encrypt(b"\x00" * ((2 * self.r + 3) * SECURITY_PARAMETER))
-
-    # The HMAC; key is of length k, output is of length k
-    def mu(self, key, data):
-        assert len(key) == SECURITY_PARAMETER
-        m = self.hash_mac_func(key, data)
-        return m
-
-    # The PRP; key is of length k, data is of length m
-    def pi(self, key, data):
-        if len(data) != PAYLOAD_SIZE:
-            raise BlockSizeMismatchError()
-        return self.lioness_encrypt(key, data)
-
-    # The inverse PRP; key is of length k, data is of length m
-    def pii(self, key, data):
-        if len(data) != PAYLOAD_SIZE:
-            raise BlockSizeMismatchError()
-        return self.lioness_decrypt(key, data)
-
-    def hb(self, alpha, s):
-        "Compute a hash of alpha and s to use as a blinding factor"
-        assert len(s) == 32
-        assert len(alpha) == 32
-        return self.group.makeexp(self.hash_func(BLINDING_HASH_PREFIX + alpha + s))
-
-    def create_stream_cipher_key(self, s):
-        assert len(s) == 32
-        return self.hash_func(RHO_HASH_PREFIX + s)
-
-    def hmu(self, s):
-        "Compute a hash of s to use as a key for the HMAC mu"
-        b = blake2b(digest_size=16)
-        b.update(MU_HASH_PREFIX)
-        b.update(s)
-        return b.digest()
+class SphinxLioness:
+    def __init__(self):
+        self.stream_cipher = SphinxStreamCipher()
+        self.digest = SphinxDigest()
 
     def create_block_cipher_key(self, secret):
         """
-        Compute a key cipher key using the secret
+        Compute a block cipher key using the secret
         """
         assert len(secret) == 32
-        stream_cipher_key = self.create_stream_cipher_key(secret)
-        c = self.stream_cipher(stream_cipher_key)
+        stream_cipher_key = self.digest.create_stream_cipher_key(secret)
+        nonce = b"\x00" * 8  # it's OK to use zero nonce because we only use it once
+        c = ChaCha20.new(key=stream_cipher_key, nonce=nonce)
         key = c.encrypt(b"\x00" * Chacha20_Blake2b_Lioness.KEY_LEN)
         assert len(key) == Chacha20_Blake2b_Lioness.KEY_LEN
         return key
 
-    def htau(self, s):
+    def encrypt(self, key, block):
+        cipher = Chacha20_Blake2b_Lioness(key, len(block))
+        return cipher.encrypt(block)
+
+    def decrypt(self, key, block):
+        cipher = Chacha20_Blake2b_Lioness(key, len(block))
+        return cipher.decrypt(block)
+
+
+class SphinxStreamCipher:
+
+    def generate_stream(self, key):
+        """
+        The PRG; key is 32 bytes, output is of length (2r+3)k
+        """
+        assert len(key) == 32
+        nonce = b"\x00" * 8  # it's OK to use zero nonce because we only use it once
+        c = ChaCha20.new(key=key, nonce=nonce)
+        return c.encrypt(b"\x00" * ((2 * MAX_HOPS + 3) * SECURITY_PARAMETER))
+
+
+class SphinxDigest:
+
+    def __init__(self):
+        self.group = GroupCurve25519()
+
+    def hash(self, data):
+        digest = blake2b(digest_size=32)
+        digest.update(data)
+        return digest.digest()
+
+    def hmac(self, key, data):
+        """
+        key is of length SECURITY_PARAMETER
+        output is of length SECURITY_PARAMETER
+        """
+        assert len(key) == SECURITY_PARAMETER
+        b = blake2b(data=data, key=key, digest_size=SECURITY_PARAMETER)
+        return b.digest()
+
+    def hash_blinding(self, alpha, s):
+        "Compute a hash of alpha and s to use as a blinding factor"
+        assert len(s) == 32
+        assert len(alpha) == 32
+        return self.group.makeexp(self.hash(BLINDING_HASH_PREFIX + alpha + s))
+
+    def create_stream_cipher_key(self, s):
+        assert len(s) == 32
+        return self.hash(STREAM_CIPHER_HASH_PREFIX + s)
+
+    def create_hmac_key(self, s):
+        "Compute a hash of s to use as a key for the HMAC mu"
+        b = blake2b(digest_size=16)
+        b.update(HMAC_HASH_PREFIX)
+        b.update(s)
+        return b.digest()
+
+    def hash_replay(self, s):
         "Compute a hash of s to use to see if we've seen s before"
-        return self.hash_func(TAU_HASH_PREFIX + s)
+        return self.hash(REPLAY_HASH_PREFIX + s)
