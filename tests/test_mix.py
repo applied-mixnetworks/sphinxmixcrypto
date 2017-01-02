@@ -3,8 +3,8 @@ import py.test
 import binascii
 
 from sphinxmixcrypto.params import SphinxParams, GroupECC, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
-from sphinxmixcrypto import SphinxNode
-from sphinxmixcrypto.node import ReplayError, BlockSizeMismatchError, SphinxNodeState
+from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket, generate_node_keypair, generate_node_id_name
+from sphinxmixcrypto.node import PacketReplayCacheDict, ReplayError, BlockSizeMismatchError, SphinxNodeState
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 from sphinxmixcrypto.common import RandReader
 
@@ -41,9 +41,12 @@ class TestSphinxCorrectness():
         self.consensus = {}
         rand_reader = RandReader()
         for i in range(numHops):
-            node = SphinxNode(self.params, rand_reader=rand_reader)
-            self.node_map[node.get_id()] = node
-            self.consensus[node.get_id()] = node.public_key
+            public_key, private_key = generate_node_keypair(self.params.group, rand_reader)
+            id, name = generate_node_id_name(self.params.k, rand_reader)
+            replay_cache = PacketReplayCacheDict()
+            node_keys = SphinxNodeState(id, name, public_key, private_key, replay_cache)
+            self.node_map[node_keys.id] = node_keys
+            self.consensus[node_keys.id] = node_keys.public_key
         route = rand_subset(self.node_map.keys(), self.r)
         return route
 
@@ -53,9 +56,8 @@ class TestSphinxCorrectness():
         message = b"this is a test"
         rand_reader = RandReader()
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
-        header = alpha, beta, gamma
-        payload = delta
-        result = self.node_map[route[0]].unwrap(header, payload)
+        packet = SphinxPacket(alpha, beta, gamma, delta)
+        result = sphinx_packet_unwrap(self.params, self.node_map[route[0]], packet)
         assert len(result.tuple_exit_hop) == 2
         assert len(result.tuple_next_hop) == 0
         assert len(result.tuple_client_hop) == 0
@@ -69,10 +71,9 @@ class TestSphinxCorrectness():
         message = b"this is a test"
         rand_reader = RandReader()
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
-        header = alpha, beta, gamma
-        payload = delta
-        self.node_map[route[0]].unwrap(header, payload)
-        py.test.raises(ReplayError, self.node_map[route[0]].unwrap, header, payload)
+        packet = SphinxPacket(alpha, beta, gamma, delta)
+        sphinx_packet_unwrap(self.params, self.node_map[route[0]], packet)
+        py.test.raises(ReplayError, sphinx_packet_unwrap, self.params, self.node_map[route[0]], packet)
 
     def test_sphinx_assoc_data(self):
         route = self.newTestRoute(5)
@@ -80,10 +81,8 @@ class TestSphinxCorrectness():
         message = b"this is a test"
         rand_reader = RandReader()
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
-        header = alpha, beta, gamma
-        payload = delta
-        assert payload is not None
-        py.test.raises(BlockSizeMismatchError, self.node_map[route[0]].unwrap, header, b"somethingelse!!!!!!!!!!!!!!")
+        packet = SphinxPacket(alpha, beta, gamma, b"somethingelse!!!!!!!!!!!!!!")
+        py.test.raises(BlockSizeMismatchError, sphinx_packet_unwrap, self.params, self.node_map[route[0]], packet)
 
 
 class TestSphinxEnd2End():
@@ -132,14 +131,12 @@ class TestSphinxEnd2End():
 
         # Create some nodes
         for i in range(len(hexedState)):
-            state = SphinxNodeState()
-            state.id = hexedState[i]['id']
-            state.public_key = hexedState[i]['public_key']
-            state.private_key = hexedState[i]['private_key']
-            node = SphinxNode(self.params, state=state)
-            self.route.append(node.id)
-            self.node_map[node.get_id()] = node
-            self.consensus[node.get_id()] = node.public_key
+            replay_cache = PacketReplayCacheDict()
+            name = None
+            state = SphinxNodeState(hexedState[i]['id'], name, hexedState[i]['public_key'], hexedState[i]['private_key'], replay_cache)
+            self.route.append(state.id)
+            self.node_map[state.id] = state
+            self.consensus[state.id] = state.public_key
 
         # Create a client
         self.alice_client = SphinxClient(self.params,
@@ -179,11 +176,12 @@ class TestSphinxEnd2End():
                     assert result.tuple_next_hop[1][2] == self.gamma
                     assert result.tuple_next_hop[2] == self.delta
 
-                result = self.send_to_mix(result.tuple_next_hop[0], result.tuple_next_hop[1], result.tuple_next_hop[2])
+                packet = SphinxPacket(result.tuple_next_hop[1][0], result.tuple_next_hop[1][1], result.tuple_next_hop[1][2], result.tuple_next_hop[2])
+                result = self.send_to_mix(result.tuple_next_hop[0], packet)
                 i += 1
             elif result.tuple_exit_hop:
                 # print("Deliver [%s] to [%s]" % (result.tuple_exit_hop[1], binascii.hexlify(result.tuple_exit_hop[0])))
-                break
+                return result.tuple_exit_hop[1]
             elif result.tuple_client_hop:
                 result = self.send_to_client(*result.tuple_client_hop)
                 # print("message received by [%s]" % result.tuple_message[0])
@@ -193,8 +191,8 @@ class TestSphinxEnd2End():
         # print("send_to_client client_id %s message_id %s delta len %s" % (client_id, binascii.hexlify(message_id), len(delta)))
         return self.params.clients[client_id].decrypt(message_id, delta)
 
-    def send_to_mix(self, destination, header, payload):
-        return self.node_map[destination].unwrap(header, payload)
+    def send_to_mix(self, destination, packet):
+        return sphinx_packet_unwrap(self.params, self.node_map[destination], packet)
 
     def test_end_to_end(self):
         rand_reader = FixedNoiseReader("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b43c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
@@ -202,14 +200,12 @@ class TestSphinxEnd2End():
         message = b"the quick brown fox"
         alpha, beta, gamma, delta = create_forward_message(self.params, self.route, self.consensus,
                                                            self.route[-1], message, rand_reader)
-        header = alpha, beta, gamma
-
-        # Send it to the first node for processing
-        result = self.node_map[self.route[0]].unwrap(header, delta)
+        packet = SphinxPacket(alpha, beta, gamma, delta)
+        result = sphinx_packet_unwrap(self.params, self.node_map[self.route[0]], packet)
         self.alpha = binascii.unhexlify("b9bc2a81df782c98a8e2b8560dc50647e2f3c013ed563b021df3e0b45378d66c")
         self.beta = binascii.unhexlify("9f486475acc1bd3bc551700f58108ea4029a250b5e893eaaf8aeb0811d84094816b3904f69d45921448454de0eb18bfda49832492a127a5682231d3848a3cb06ca17c3427063f80d662997b30bc9307a676cd6972716d1d6ee59b657f368b0fdb0245872e5157dd3de788341518c328395b415b516bd47efb86302edf840eebd9de432e08d6b9fddd4d55f75112332e403d78e536193aa172c0dbffbc9631d8c877214abef61d54bd0a35114e5f0eace")
         self.gamma = binascii.unhexlify("59f86271afb940c9e7c187b9966b9a42")
         self.delta = binascii.unhexlify("320e9422cb6ecdc8de8cebacf32dd676d9e8142070856275ff39efacc39d09ff61f75f2633c232015f638d4ac72ee211b41d1f3351f600b47c1638640956fff1f00f61a744a4df75ed730de2eb3b5bb4fa65df8d775d606705ccf0ce8f66a444f04dfaee50c0d23c4ae1b217bf28e49db77df4b91aba049514ed1c8f55648f176b4a9d3045433d838063a830523e6e5bdc53e0278734436df2a3936df05b2ae68fadf26e7913216606ec1dbcd64cf54e0f63bd03e08bcd7d73eb6336d70104b1f85c0d8086a4da656d1bdc24b91cc443efa9022223af8d651d04b5611931cd7d91fe4a5ef031e0409ff80fc398e350fe9307d9b3c673b60c162c5581630ae7733f947a214979f7e7ef8e8481a1e59eec700d92e6d8ca279a06d4ff3c6f960c74b6473842c44323576b383de01a4b16077fe740d6f3dfabad6fc85d3b972dccca9eb9040f9b2df3b21e7e679df41d6a5750df3c9da5a9ca2a5d9a7b233378a195e7ec995fc588fef6f537ec082d7b755dffee56646bc75f7f38bdb91945e3aa6aeee0fe5cd31eed271e69b930a9893e3dc0ca8516afa382eb72fab61e915b8b70babef87a69460fec2e26a3c34983271766746f034c4562d62d494e70b444b6ff7d71f866133858fece4baaa18442a7528a0cba298169c3c315b00369569a23040d26db6df452a7d79f7ed2e7aebcdee23f34765f0f91917a00353c4692f64c20f4517cd7826f1962dd3fcda86a4ba0772fb5d9466ab340359233bf6452f4b5cd208f5a40114a1ceed1fb643a4e7bb676bcb16bd8eb78b0082a3a1dcc17f84f984c820885ac90cc9f249fec002d929747875f4fb31752d5d586addb512e122256e4c1350e7df34a2c1d708f4a4f51ce5527e2b9757a4cf199be26d53124fe0ac965694723224b9fbccf78ad3c2d873d480569b853ffdb526b9a5b9f17d26f27cad103237e19e69c24cc8d27637f1cbef38aa93eb5d221878d806373579e1760facd50690926260a3ae0a544f5788ef11d03266295d6794b1ba3d5861aa715b1e989f09fe3ed645ba6a5ccb9b4474d874189f149d9617bc0cf3f071aaa04d3f2d7a5d8b143b234f266dfcbd892ba502215785c39abf98b5617c4b2a4c9284d562f8c26da44200fbd526a4469677cb925a6a26322ac2e651df6f32b3fe0fc393a6eab18a48b7d2c54346ae5cc0ffcb539adf0ce398d180f78577427749a8c99edf55f91677fcc451762978b384966baeb63b20d4ad7e5ec2f9bc63812ffb8a14074cbca66bd80b3df6cb50024f332f4c466efb5bed156845d3deb6785df4d1dc99021ce70a1cd575b7e65739ee7e02baf955605ee3cc9e335e811bd28eda3482fa8cd25e50e56950828bc0bfe3d0489b0149242c4e5d39d7d4f8f1b049c530e8e827359573bcc18abcc30ee639341375b56cb6ffc5702e0912955059ee974bc603f")
         self.match_hop = "ff81855a360000000000000000000000"
-        self.mixnet_test_state_machine(result)
-        assert self.node_map[self.route[-1]].received[0] == message
+        result = self.mixnet_test_state_machine(result)
+        assert result == message

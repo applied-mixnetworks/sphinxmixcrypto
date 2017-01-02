@@ -18,12 +18,16 @@
 # <http://www.gnu.org/licenses/>.
 
 """
-This SphinxNode module includes cryptographic algorithms for mix net nodes
+This module includes cryptographic unwrapping of messages for mix net nodes
 """
 
 import binascii
 
 from sphinxmixcrypto.padding import remove_padding
+
+
+# Sphinx provides 128 bits of security as does curve25519
+SECURITY_PARAMETER = 16
 
 
 class HeaderAlphaGroupMismatchError(Exception):
@@ -65,6 +69,24 @@ class BlockSizeMismatchError(Exception):
 DSPEC = b"\x00"  # The special destination
 
 
+# Decode the prefix-free encoding.
+# Returns the type, value, and the remainder of the input string
+def prefix_free_decode(s):
+    if len(s) == 0:
+        return None, None, None
+    if isinstance(s[0], int):
+        l = s[0]
+    else:
+        l = ord(s[0])
+    if l == 0:
+        return 'Dspec', None, s[1:]
+    if l == 255:
+        return 'node', s[:SECURITY_PARAMETER], s[SECURITY_PARAMETER:]
+    if l < 128:
+        return 'dest', s[1:l + 1], s[l + 1:]
+    return None, None, None
+
+
 def destination_encode(dest):
     """
     encode destination
@@ -94,6 +116,14 @@ def generate_node_keypair(group, rand_reader):
     return public_key, private_key
 
 
+class SphinxPacket:
+    def __init__(self, alpha, beta, gamma, delta):
+        self.alpha = alpha
+        self.beta = beta
+        self.gamma = gamma
+        self.delta = delta
+
+
 class UnwrappedMessage:
     def __init__(self):
         self.tuple_next_hop = ()
@@ -102,93 +132,70 @@ class UnwrappedMessage:
 
 
 class SphinxNodeState:
+    def __init__(self, id, name, public_key, private_key, replay_cache):
+        self.id = id
+        self.name = name
+        self.public_key = public_key
+        self.private_key = private_key
+        self.replay_cache = replay_cache
+
+
+class PacketReplayCacheDict:
     def __init__(self):
-        self.private_key = None
-        self.public_key = None
-        self.id = None
-        self.name = None
+        self.cache = {}
+
+    def has_seen(self, tag):
+        return tag in self.cache
+
+    def set_seen(self, tag):
+        self.cache[tag] = True
+
+    def flush(self):
+        self.cache = {}
 
 
-class SphinxNode:
-    def __init__(self, params, state=None, rand_reader=None):
-        self.params = params
-        if state is None:
-            assert rand_reader is not None
-            self.public_key, self.private_key = generate_node_keypair(self.params.group, rand_reader)
-            self.id, self.name = generate_node_id_name(self.params.k, rand_reader)
-        else:
-            assert isinstance(state, SphinxNodeState)
-            self.private_key = state.private_key
-            self.public_key = state.public_key
-            self.id = state.id
-            self.name = state.name
-        self.received = []
-        self.seen = {}
+def sphinx_packet_unwrap(params, node_state, packet):
+    """
+    unwrap returns a UnwrappedMessage given a header and payload
+    or raises an exception if an error was encountered
+    """
+    result = UnwrappedMessage()
+    p = params
+    group = p.group
+    if not group.in_group(packet.alpha):
+        raise HeaderAlphaGroupMismatchError()
+    s = group.expon(packet.alpha, node_state.private_key)
+    tag = p.htau(s)
+    if node_state.replay_cache.has_seen(tag):
+        raise ReplayError()
+    if packet.gamma != p.mu(p.hmu(s), packet.beta):
+        raise IncorrectMACError()
+    node_state.replay_cache.set_seen(tag)
+    payload = p.pii(p.create_block_cipher_key(s), packet.delta)
+    B = p.xor(packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), p.rho(p.create_stream_cipher_key(s)))
+    message_type, val, rest = prefix_free_decode(B)
 
-    def get_id(self):
-        return self.id
-
-    # Decode the prefix-free encoding.  Return the type, value, and the
-    # remainder of the input string
-    def _prefix_free_decode(self, s):
-        if len(s) == 0:
-            return None, None, None
-        if isinstance(s[0], int):
-            l = s[0]
-        else:
-            l = ord(s[0])
-        if l == 0:
-            return 'Dspec', None, s[1:]
-        if l == 255:
-            return 'node', s[:self.params.k], s[self.params.k:]
-        if l < 128:
-            return 'dest', s[1:l + 1], s[l + 1:]
-        return None, None, None
-
-    def unwrap(self, header, delta):
-        """
-        unwrap returns a UnwrappedMessage given a header and payload
-        or raises an exception if an error was encountered
-        """
-        result = UnwrappedMessage()
-        p = self.params
-        group = p.group
-        alpha, beta, gamma = header
-        if not group.in_group(alpha):
-            raise HeaderAlphaGroupMismatchError()
-        s = group.expon(alpha, self.private_key)
-        tag = p.htau(s)
-        if tag in self.seen:
-            raise ReplayError()
-        if gamma != p.mu(p.hmu(s), beta):
-            raise IncorrectMACError()
-        self.seen[tag] = 1
-        payload = p.pii(p.create_block_cipher_key(s), delta)
-        B = p.xor(beta + (b"\x00" * (2 * p.k)), p.rho(p.create_stream_cipher_key(s)))
-        message_type, val, rest = self._prefix_free_decode(B)
-
-        if message_type == "node":
-            b = p.hb(alpha, s)
-            alpha = group.expon(alpha, b)
-            gamma = B[p.k:p.k * 2]
-            beta = B[p.k * 2:]
-            result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
-            return result
-        elif message_type == "Dspec":
-            if payload[:p.k] == (b"\x00" * p.k):
-                inner_type, val, rest = self._prefix_free_decode(payload[p.k:])
-                if inner_type == "dest":
-                    # We're to deliver rest (unpadded) to val
-                    body = remove_padding(rest)
-                    self.received.append(body)
-                    result.tuple_exit_hop = (val, body)
-                    return result
-            raise InvalidSpecialDestinationError()
-        elif message_type == "dest":
-            id = rest[:p.k]
-            if val in p.clients:  # val is client-id
-                result.tuple_client_hop = (val, id, payload)
+    if message_type == "node":
+        b = p.hb(packet.alpha, s)
+        alpha = group.expon(packet.alpha, b)
+        gamma = B[SECURITY_PARAMETER:SECURITY_PARAMETER * 2]
+        beta = B[SECURITY_PARAMETER * 2:]
+        result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
+        return result
+    elif message_type == "Dspec":
+        if payload[:SECURITY_PARAMETER] == (b"\x00" * SECURITY_PARAMETER):
+            inner_type, val, rest = prefix_free_decode(payload[SECURITY_PARAMETER:])
+            if inner_type == "dest":
+                # We're to deliver rest (unpadded) to val
+                body = remove_padding(rest)
+                result.tuple_exit_hop = (val, body)
                 return result
-            else:
-                raise NoSuchClientError()
-        raise InvalidMessageTypeError()
+        raise InvalidSpecialDestinationError()
+    elif message_type == "dest":
+        id = rest[:SECURITY_PARAMETER]
+        if val in p.clients:  # val is client-id
+            result.tuple_client_hop = (val, id, payload)
+            return result
+        else:
+            raise NoSuchClientError()
+    raise InvalidMessageTypeError()

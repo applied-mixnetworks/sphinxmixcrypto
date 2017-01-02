@@ -20,7 +20,7 @@
 import os
 import binascii
 
-from sphinxmixcrypto.node import destination_encode, DSPEC
+from sphinxmixcrypto.node import destination_encode, DSPEC, SECURITY_PARAMETER
 from sphinxmixcrypto.padding import add_padding, remove_padding
 from sphinxmixcrypto.common import RandReader
 
@@ -39,13 +39,13 @@ def rand_subset(lst, nu):
 
 def create_header(params, route, node_map, dest, message_id, rand_reader):
     route_len = len(route)
-    assert len(dest) <= 2 * (params.r - route_len + 1) * params.k
+    assert len(dest) <= 2 * (params.r - route_len + 1) * SECURITY_PARAMETER
     assert route_len <= params.r
-    assert len(message_id) == params.k
+    assert len(message_id) == SECURITY_PARAMETER
     p = params
     group = p.group
     x = group.gensecret(rand_reader)
-    padding = rand_reader.read(((2 * (params.r - route_len) + 2) * params.k - len(dest)))
+    padding = rand_reader.read(((2 * (params.r - route_len) + 2) * SECURITY_PARAMETER - len(dest)))
 
     # Compute the (alpha, s, b) tuples
     blinds = [x]
@@ -60,21 +60,21 @@ def create_header(params, route, node_map, dest, message_id, rand_reader):
     # Compute the filler strings
     phi = b''
     for i in range(1, route_len):
-        min = (2 * (p.r - i) + 3) * p.k
-        phi = p.xor(phi + (b"\x00" * (2 * p.k)),
+        min = (2 * (p.r - i) + 3) * SECURITY_PARAMETER
+        phi = p.xor(phi + (b"\x00" * (2 * SECURITY_PARAMETER)),
                     p.rho(p.create_stream_cipher_key(asbtuples[i - 1]['s']))[min:])
 
     # Compute the (beta, gamma) tuples
     beta = dest + message_id + padding
     beta = p.xor(beta,
-                 p.rho(p.create_stream_cipher_key(asbtuples[route_len - 1]['s']))[:(2 * (p.r - route_len) + 3) * p.k]) + phi
+                 p.rho(p.create_stream_cipher_key(asbtuples[route_len - 1]['s']))[:(2 * (p.r - route_len) + 3) * SECURITY_PARAMETER]) + phi
     gamma_key = p.hmu(asbtuples[route_len - 1]['s'])
     gamma = p.mu(gamma_key, beta)
     for i in range(route_len - 2, -1, -1):
         message_id = route[i + 1]
-        assert len(message_id) == p.k
-        beta = p.xor(message_id + gamma + beta[:(2 * p.r - 1) * p.k],
-                     p.rho(p.create_stream_cipher_key(asbtuples[i]['s']))[:(2 * p.r + 1) * p.k])
+        assert len(message_id) == SECURITY_PARAMETER
+        beta = p.xor(message_id + gamma + beta[:(2 * p.r - 1) * SECURITY_PARAMETER],
+                     p.rho(p.create_stream_cipher_key(asbtuples[i]['s']))[:(2 * p.r + 1) * SECURITY_PARAMETER])
         gamma = p.mu(p.hmu(asbtuples[i]['s']), beta)
     return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
 
@@ -83,11 +83,11 @@ def create_forward_message(params, route, node_map, dest, msg, rand_reader):
     p = params
     route_len = len(route)
     assert len(dest) < 128 and len(dest) > 0
-    assert p.k + 1 + len(dest) + len(msg) < p.m
+    assert SECURITY_PARAMETER + 1 + len(dest) + len(msg) < p.m
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * p.k, rand_reader)
+    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
     encoded_dest = destination_encode(dest)
-    body = (b"\x00" * p.k) + bytes(encoded_dest) + bytes(msg)
+    body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
     padded_body = add_padding(body, p.m)
 
     # Compute the delta values
@@ -101,7 +101,7 @@ def create_forward_message(params, route, node_map, dest, msg, rand_reader):
 
 def create_surb(params, route, node_map, dest, rand_reader):
     p = params
-    message_id = rand_reader.read(p.k)
+    message_id = rand_reader.read(SECURITY_PARAMETER)
 
     # Compute the header and the secrets
     header, secrets = create_header(params, route, node_map, destination_encode(dest), message_id, rand_reader)
@@ -167,8 +167,8 @@ class SphinxClient:
             delta = p.pi(keytuple[i], delta)
         delta = p.pii(p.create_block_cipher_key(ktilde), delta)
 
-        if delta[:p.k] == (b"\x00" * p.k):
-            msg = remove_padding(delta[p.k:])
+        if delta[:SECURITY_PARAMETER] == (b"\x00" * SECURITY_PARAMETER):
+            msg = remove_padding(delta[SECURITY_PARAMETER:])
             message.tuple_message = (self.id, msg)
             return message
 
