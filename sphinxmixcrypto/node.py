@@ -23,8 +23,10 @@ This module includes cryptographic unwrapping of messages for mix net nodes
 """
 
 import binascii
+import zope.interface
 
 from sphinxmixcrypto.padding import remove_padding
+from sphinxmixcrypto.common import IPacketReplayCache, ISphinxNodeState
 
 
 # Sphinx provides 128 bits of security as does curve25519
@@ -132,7 +134,9 @@ class UnwrappedMessage:
         self.tuple_client_hop = ()
 
 
+@zope.interface.implementer(ISphinxNodeState)
 class SphinxNodeState:
+
     def __init__(self, id, name, public_key, private_key, replay_cache):
         self.id = id
         self.name = name
@@ -141,7 +145,9 @@ class SphinxNodeState:
         self.replay_cache = replay_cache
 
 
+@zope.interface.implementer(IPacketReplayCache)
 class PacketReplayCacheDict:
+
     def __init__(self):
         self.cache = {}
 
@@ -160,6 +166,8 @@ def sphinx_packet_unwrap(params, node_state, packet):
     unwrap returns a UnwrappedMessage given a header and payload
     or raises an exception if an error was encountered
     """
+
+    assert ISphinxNodeState.providedBy(node_state)
     result = UnwrappedMessage()
     p = params
     group = p.group

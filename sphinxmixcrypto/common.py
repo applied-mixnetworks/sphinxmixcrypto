@@ -17,6 +17,40 @@
 #
 
 import os
+import zope.interface
+
+
+class IPacketReplayCache(zope.interface.Interface):
+    """
+    Interface to a Sphinx packet replay tag cache which
+    is used to detect replayed Sphinx packets.
+    """
+
+    def has_seen(self, tag):
+        """
+        Returns True if the tag has been seen, otherwise False.
+        """
+
+    def set_seen(self, tag):
+        """
+        Sets the tag into the cache so that subsequent calls to
+        has_seen will return True.
+        """
+
+    def flush(self):
+        """
+        Flushes cache, all entries are removed.
+        """
+
+
+class ISphinxNodeState(zope.interface.Interface):
+    """
+    Interface for a class providing Sphinx mix node state.
+    """
+    replay_cache = zope.interface.Attribute("""replay_cache IPacketReplayCache""")
+    zope.interface.invariant(IPacketReplayCache.providedBy(replay_cache))
+    public_key = zope.interface.Attribute("""public_key 32 byte public key""")
+    private_key = zope.interface.Attribute("""private_key 32 byte private key""")
 
 
 class RandReader:
