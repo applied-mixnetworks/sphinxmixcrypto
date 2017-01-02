@@ -32,7 +32,7 @@ from Cryptodome.Cipher import ChaCha20
 from pylioness import Chacha20_Blake2b_Lioness
 
 from sphinxmixcrypto.nym_server import Nymserver
-from sphinxmixcrypto.node import KeyMismatchError, BlockSizeMismatchError
+from sphinxmixcrypto.node import KeyMismatchError, BlockSizeMismatchError, SECURITY_PARAMETER
 
 
 BLINDING_HASH_PREFIX = b'\x11'
@@ -137,20 +137,6 @@ class SphinxParams:
         self.stream_cipher = stream_cipher
         self.nymserver = Nymserver(self)
 
-    def get_dimensions(self):
-        """
-        header overhead = p + (2r + 2)s
-        where p is the asymmetric element,
-        s is the symmetric element and
-        r is the max route length
-        alpha 32 beta 176 gamma 16 delta 1024
-        """
-        alpha = self.group.size
-        beta = (2 * self.r + 1) * self.k
-        gamma = self.k
-        delta = self.m
-        return alpha, beta, gamma, delta
-
     def lioness_encrypt(self, key, data):
         c = self.lioness_class(key, len(data))
         return c.encrypt(data)
@@ -168,11 +154,11 @@ class SphinxParams:
     def rho(self, key):
         assert len(key) == 32
         c = self.stream_cipher(key)
-        return c.encrypt(b"\x00" * ((2 * self.r + 3) * self.k))
+        return c.encrypt(b"\x00" * ((2 * self.r + 3) * SECURITY_PARAMETER))
 
     # The HMAC; key is of length k, output is of length k
     def mu(self, key, data):
-        assert len(key) == self.k
+        assert len(key) == SECURITY_PARAMETER
         m = self.hash_mac_func(key, data)
         return m
 
