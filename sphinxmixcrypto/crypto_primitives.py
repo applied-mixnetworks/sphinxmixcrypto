@@ -32,7 +32,7 @@ from Cryptodome.Cipher import ChaCha20
 from pylioness import Chacha20_Blake2b_Lioness
 
 from sphinxmixcrypto.nym_server import Nymserver
-from sphinxmixcrypto.node import KeyMismatchError, BlockSizeMismatchError, SECURITY_PARAMETER
+from sphinxmixcrypto.node import BlockSizeMismatchError, SECURITY_PARAMETER
 
 
 BLINDING_HASH_PREFIX = b'\x11'
@@ -40,6 +40,7 @@ RHO_HASH_PREFIX = b'\x22'
 MU_HASH_PREFIX = b'\x33'
 PI_HASH_PREFIX = b'\x44'
 TAU_HASH_PREFIX = b'\x55'
+PAYLOAD_SIZE = 1024  # XXX change me
 
 
 class GroupCurve25519:
@@ -164,17 +165,13 @@ class SphinxParams:
 
     # The PRP; key is of length k, data is of length m
     def pi(self, key, data):
-        if len(key) != Chacha20_Blake2b_Lioness.KEY_LEN:
-            raise KeyMismatchError()
-        if len(data) != self.m:
+        if len(data) != PAYLOAD_SIZE:
             raise BlockSizeMismatchError()
         return self.lioness_encrypt(key, data)
 
     # The inverse PRP; key is of length k, data is of length m
     def pii(self, key, data):
-        if len(key) != Chacha20_Blake2b_Lioness.KEY_LEN:
-            raise KeyMismatchError()
-        if len(data) != self.m:
+        if len(data) != PAYLOAD_SIZE:
             raise BlockSizeMismatchError()
         return self.lioness_decrypt(key, data)
 

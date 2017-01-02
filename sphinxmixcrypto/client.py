@@ -20,6 +20,7 @@ import os
 import binascii
 
 from sphinxmixcrypto.node import destination_encode, DSPEC, SECURITY_PARAMETER
+from sphinxmixcrypto.crypto_primitives import PAYLOAD_SIZE
 from sphinxmixcrypto.padding import add_padding, remove_padding
 from sphinxmixcrypto.common import RandReader
 
@@ -82,12 +83,12 @@ def create_forward_message(params, route, node_map, dest, msg, rand_reader):
     p = params
     route_len = len(route)
     assert len(dest) < 128 and len(dest) > 0
-    assert SECURITY_PARAMETER + 1 + len(dest) + len(msg) < p.m
+    assert SECURITY_PARAMETER + 1 + len(dest) + len(msg) < PAYLOAD_SIZE
     # Compute the header and the secrets
     header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
     encoded_dest = destination_encode(dest)
     body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
-    padded_body = add_padding(body, p.m)
+    padded_body = add_padding(body, PAYLOAD_SIZE)
 
     # Compute the delta values
     key = p.create_block_cipher_key(secrets[route_len - 1])
