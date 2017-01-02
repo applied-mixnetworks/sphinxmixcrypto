@@ -45,7 +45,7 @@ class IncorrectMACError(Exception):
     pass
 
 
-class InvalidSpecialDestinationError(Exception):
+class InvalidProcessDestinationError(Exception):
     pass
 
 
@@ -82,11 +82,11 @@ def prefix_free_decode(s):
     else:
         l = ord(s[0])
     if l == 0:
-        return 'Dspec', None, s[1:]
+        return 'process', None, s[1:]
     if l == 255:
-        return 'node', s[:SECURITY_PARAMETER], s[SECURITY_PARAMETER:]
+        return 'mix', s[:SECURITY_PARAMETER], s[SECURITY_PARAMETER:]
     if l < 128:
-        return 'dest', s[1:l + 1], s[l + 1:]
+        return 'client', s[1:l + 1], s[l + 1:]
     return None, None, None
 
 
@@ -184,23 +184,23 @@ def sphinx_packet_unwrap(params, node_state, packet):
     B = p.xor(packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), p.rho(p.create_stream_cipher_key(s)))
     message_type, val, rest = prefix_free_decode(B)
 
-    if message_type == "node":
+    if message_type == "mix":
         b = p.hb(packet.alpha, s)
         alpha = group.expon(packet.alpha, b)
         gamma = B[SECURITY_PARAMETER:SECURITY_PARAMETER * 2]
         beta = B[SECURITY_PARAMETER * 2:]
         result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
         return result
-    elif message_type == "Dspec":
+    elif message_type == "process":
         if payload[:SECURITY_PARAMETER] == (b"\x00" * SECURITY_PARAMETER):
             inner_type, val, rest = prefix_free_decode(payload[SECURITY_PARAMETER:])
-            if inner_type == "dest":
+            if inner_type == "client":
                 # We're to deliver rest (unpadded) to val
                 body = remove_padding(rest)
                 result.tuple_exit_hop = (val, body)
                 return result
-        raise InvalidSpecialDestinationError()
-    elif message_type == "dest":
+        raise InvalidProcessDestinationError()
+    elif message_type == "client":
         id = rest[:SECURITY_PARAMETER]
         if val in p.clients:  # val is client-id
             result.tuple_client_hop = (val, id, payload)

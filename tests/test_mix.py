@@ -5,8 +5,9 @@ import binascii
 from sphinxmixcrypto.crypto_primitives import SphinxParams, GroupCurve25519, Chacha_Lioness, Chacha20_stream_cipher
 from sphinxmixcrypto.crypto_primitives import Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket, generate_node_keypair, generate_node_id_name
-from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, BlockSizeMismatchError
-from sphinxmixcrypto import SphinxNodeState, IncorrectMACError, HeaderAlphaGroupMismatchError
+from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, BlockSizeMismatchError, SECURITY_PARAMETER, create_header, DSPEC
+from sphinxmixcrypto import SphinxNodeState, IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
+from sphinxmixcrypto import add_padding, InvalidProcessDestinationError
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 from sphinxmixcrypto.common import RandReader
 
@@ -54,7 +55,7 @@ class TestSphinxCorrectness():
 
     def test_sphinx_single_hop(self):
         route = self.newTestRoute(1)
-        destination = b"dest"
+        destination = b"client"
         message = b"this is a test"
         rand_reader = RandReader()
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
@@ -69,7 +70,7 @@ class TestSphinxCorrectness():
 
     def test_sphinx_replay(self):
         route = self.newTestRoute(5)
-        destination = b"dest"
+        destination = b"client"
         message = b"this is a test"
         rand_reader = RandReader()
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
@@ -80,7 +81,7 @@ class TestSphinxCorrectness():
 
     def test_sphinx_assoc_data(self):
         route = self.newTestRoute(5)
-        destination = b"dest"
+        destination = b"client"
         message = b"this is a test"
         rand_reader = RandReader()
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
@@ -89,7 +90,7 @@ class TestSphinxCorrectness():
 
     def test_sphinx_corrupt_mac(self):
         route = self.newTestRoute(5)
-        destination = b"dest"
+        destination = b"client"
         message = b"this is a test"
         rand_reader = RandReader()
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
@@ -231,3 +232,47 @@ class TestSphinxEnd2End():
         self.match_hop = "ff81855a360000000000000000000000"
         result = self.mixnet_test_state_machine(result)
         assert result == message
+
+    def mixnet_test_corrupted_packet_state_machine(self, result):
+        i = 0
+        while True:
+            if result.tuple_next_hop:
+                packet = SphinxPacket(result.tuple_next_hop[1][0], result.tuple_next_hop[1][1], result.tuple_next_hop[1][2], result.tuple_next_hop[2])
+                result = self.send_to_mix(result.tuple_next_hop[0], packet)
+                i += 1
+            elif result.tuple_exit_hop:
+                return result.tuple_exit_hop[1]
+            elif result.tuple_client_hop:
+                result = self.send_to_client(*result.tuple_client_hop)
+                return result
+
+    def test_sphinx_corrupted_process_message(self):
+        rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
+        self.setUpMixVectors(rand_reader)
+        destination = b"dest"
+        message = b"this is a test"
+        rand_reader = RandReader()
+        alpha, beta, gamma, delta = create_corrupt_process_message(self.params, self.route, self.consensus, destination, message, rand_reader)
+        packet = SphinxPacket(alpha, beta, gamma, delta)
+        result = sphinx_packet_unwrap(self.params, self.node_map[self.route[0]], packet)
+        py.test.raises(InvalidProcessDestinationError, self.mixnet_test_corrupted_packet_state_machine, result)
+
+
+def create_corrupt_process_message(params, route, node_map, dest, msg, rand_reader):
+    p = params
+    route_len = len(route)
+    assert len(dest) < 128 and len(dest) > 0
+    assert SECURITY_PARAMETER + 1 + len(dest) + len(msg) < p.m
+    # Compute the header and the secrets
+    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
+    encoded_dest = destination_encode(dest)
+    body = (b"\xFF" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
+    padded_body = add_padding(body, p.m)
+
+    # Compute the delta values
+    key = p.create_block_cipher_key(secrets[route_len - 1])
+    delta = p.pi(key, padded_body)
+    for i in range(route_len - 2, -1, -1):
+        delta = p.pi(p.create_block_cipher_key(secrets[i]), delta)
+    alpha, beta, gamma = header
+    return alpha, beta, gamma, delta
