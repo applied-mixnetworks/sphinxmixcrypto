@@ -1,7 +1,7 @@
 
 import binascii
 
-from sphinxmixcrypto.params import SphinxParams, GroupCurve25519, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
+from sphinxmixcrypto.crypto_primitives import SphinxParams, GroupCurve25519, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
 from pylioness.lioness import Chacha20_Blake2b_Lioness
 
 

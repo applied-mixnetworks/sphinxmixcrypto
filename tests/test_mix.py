@@ -2,9 +2,11 @@
 import py.test
 import binascii
 
-from sphinxmixcrypto.params import SphinxParams, GroupCurve25519, Chacha_Lioness, Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
+from sphinxmixcrypto.crypto_primitives import SphinxParams, GroupCurve25519, Chacha_Lioness, Chacha20_stream_cipher
+from sphinxmixcrypto.crypto_primitives import Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket, generate_node_keypair, generate_node_id_name
-from sphinxmixcrypto.node import PacketReplayCacheDict, ReplayError, BlockSizeMismatchError, SphinxNodeState
+from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, BlockSizeMismatchError
+from sphinxmixcrypto import SphinxNodeState, IncorrectMACError, HeaderAlphaGroupMismatchError
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 from sphinxmixcrypto.common import RandReader
 
@@ -84,6 +86,25 @@ class TestSphinxCorrectness():
         alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
         packet = SphinxPacket(alpha, beta, gamma, b"somethingelse!!!!!!!!!!!!!!")
         py.test.raises(BlockSizeMismatchError, sphinx_packet_unwrap, self.params, self.node_map[route[0]], packet)
+
+    def test_sphinx_corrupt_mac(self):
+        route = self.newTestRoute(5)
+        destination = b"dest"
+        message = b"this is a test"
+        rand_reader = RandReader()
+        alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
+        packet = SphinxPacket(alpha, beta, b"somethingelse!!!!!!!!!!!!!!", delta)
+        py.test.raises(IncorrectMACError, sphinx_packet_unwrap, self.params, self.node_map[route[0]], packet)
+
+    def test_sphinx_alpha_too_big(self):
+        route = self.newTestRoute(5)
+        destination = b"dest"
+        message = b"this is a test"
+        rand_reader = RandReader()
+        alpha, beta, gamma, delta = create_forward_message(self.params, route, self.consensus, destination, message, rand_reader)
+        alpha = alpha + b"A"
+        packet = SphinxPacket(alpha, beta, gamma, delta)
+        py.test.raises(HeaderAlphaGroupMismatchError, sphinx_packet_unwrap, self.params, self.node_map[route[0]], packet)
 
 
 class TestSphinxEnd2End():
