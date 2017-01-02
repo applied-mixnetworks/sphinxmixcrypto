@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 # Copyright 2011 Ian Goldberg
+# Copyright 2016-2017 David Stainton
 #
 # This file is part of Sphinx.
 #

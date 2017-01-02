@@ -1,0 +1,11 @@
+
+Files: nym_server.py, crypto_primitives.py, node.py, client.py
+Copyright:
+  Copyright (C) 2011 Ian Goldberg
+  Copyright (C) 2016-2017 David Stainton
+License: GPL3
+
+Files: padding.py, test_padding.py, test_mix.py, test_utils.py, test_crypto_primitives.py
+Copyright:
+  Copyright (C) 2016-2017 David Stainton
+License: GPL3
