@@ -7,7 +7,7 @@ from sphinxmixcrypto.crypto_primitives import Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket, generate_node_keypair, generate_node_id_name
 from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, BlockSizeMismatchError, SECURITY_PARAMETER, create_header, DSPEC
 from sphinxmixcrypto import SphinxNodeState, IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
-from sphinxmixcrypto import add_padding, InvalidProcessDestinationError
+from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 from sphinxmixcrypto.common import RandReader
 
@@ -258,6 +258,17 @@ class TestSphinxEnd2End():
         py.test.raises(InvalidProcessDestinationError, self.mixnet_test_corrupted_packet_state_machine, result)
 
 
+    def test_sphinx_invalid_message(self):
+        rand_reader = FixedNoiseReader("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b43c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
+        self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
+        message = b"the quick brown fox"
+        alpha, beta, gamma, delta = create_invalid_message(self.params, self.route, self.consensus,
+                                                           self.route[-1], message, rand_reader)
+        packet = SphinxPacket(alpha, beta, gamma, delta)
+        result = sphinx_packet_unwrap(self.params, self.node_map[self.route[0]], packet)
+        py.test.raises(InvalidMessageTypeError, self.mixnet_test_corrupted_packet_state_machine, result)
+
+
 def create_corrupt_process_message(params, route, node_map, dest, msg, rand_reader):
     p = params
     route_len = len(route)
@@ -267,6 +278,25 @@ def create_corrupt_process_message(params, route, node_map, dest, msg, rand_read
     header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
     encoded_dest = destination_encode(dest)
     body = (b"\xFF" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
+    padded_body = add_padding(body, p.m)
+
+    # Compute the delta values
+    key = p.create_block_cipher_key(secrets[route_len - 1])
+    delta = p.pi(key, padded_body)
+    for i in range(route_len - 2, -1, -1):
+        delta = p.pi(p.create_block_cipher_key(secrets[i]), delta)
+    alpha, beta, gamma = header
+    return alpha, beta, gamma, delta
+
+def create_invalid_message(params, route, node_map, dest, msg, rand_reader):
+    p = params
+    route_len = len(route)
+    assert len(dest) < 128 and len(dest) > 0
+    assert SECURITY_PARAMETER + 1 + len(dest) + len(msg) < p.m
+    # Compute the header and the secrets
+    header, secrets = create_header(params, route, node_map, b"\xFE" * SECURITY_PARAMETER, b"\xFE" * SECURITY_PARAMETER, rand_reader)
+    encoded_dest = destination_encode(dest)
+    body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
     padded_body = add_padding(body, p.m)
 
     # Compute the delta values
