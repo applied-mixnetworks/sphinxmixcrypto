@@ -9,13 +9,14 @@ from sphinxmixcrypto.node import sphinx_packet_unwrap, generate_node_id, generat
 from sphinxmixcrypto.node import generate_node_keypair, SphinxNodeState, SphinxPacket, SECURITY_PARAMETER
 from sphinxmixcrypto.node import PacketReplayCacheDict, ReplayError, BlockSizeMismatchError, IncorrectMACError
 from sphinxmixcrypto.node import HeaderAlphaGroupMismatchError, DSPEC, destination_encode, InvalidProcessDestinationError
-from sphinxmixcrypto.node import InvalidMessageTypeError
+from sphinxmixcrypto.node import InvalidMessageTypeError, NoSuchClientError
 from sphinxmixcrypto.crypto_primitives import SphinxParams, GroupCurve25519, Chacha_Lioness
 from sphinxmixcrypto.crypto_primitives import Chacha20_stream_cipher, Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto.nym_server import Nymserver
 from sphinxmixcrypto.padding import add_padding, remove_padding
 
 __all__ = [
+    "NoSuchClientError",
     "InvalidMessageTypeError",
     "InvalidProcessDestinationError",
     "destination_encode",

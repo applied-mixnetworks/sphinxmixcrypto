@@ -7,7 +7,7 @@ from sphinxmixcrypto.crypto_primitives import Blake2_hash, Blake2_hash_mac
 from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket, generate_node_keypair, generate_node_id_name
 from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, BlockSizeMismatchError, SECURITY_PARAMETER, create_header, DSPEC
 from sphinxmixcrypto import SphinxNodeState, IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
-from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError
+from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError, NoSuchClientError
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
 from sphinxmixcrypto.common import RandReader
 
@@ -257,7 +257,6 @@ class TestSphinxEnd2End():
         result = sphinx_packet_unwrap(self.params, self.node_map[self.route[0]], packet)
         py.test.raises(InvalidProcessDestinationError, self.mixnet_test_corrupted_packet_state_machine, result)
 
-
     def test_sphinx_invalid_message(self):
         rand_reader = FixedNoiseReader("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b43c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
         self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
@@ -267,6 +266,17 @@ class TestSphinxEnd2End():
         packet = SphinxPacket(alpha, beta, gamma, delta)
         result = sphinx_packet_unwrap(self.params, self.node_map[self.route[0]], packet)
         py.test.raises(InvalidMessageTypeError, self.mixnet_test_corrupted_packet_state_machine, result)
+
+    def test_sphinx_nonexistent_client_message(self):
+        rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
+        self.setUpMixVectors(rand_reader)
+        nym_id = b"Cypherpunk"
+        nym_tuple = self.alice_client.create_nym(self.route, self.consensus)
+        self.params.nymserver.add_surb(nym_id, nym_tuple)
+        message = b"Open, secure and reliable connectivity is necessary (although not sufficient) to excercise the human rights such as freedom of expression and freedom of association [FOC], as defined in the Universal Declaration of Human Rights [UDHR]."
+        nym_result = self.params.nymserver.process(nym_id, message)
+        self.params.clients = []
+        py.test.raises(NoSuchClientError, self.mixnet_test_corrupted_packet_state_machine, nym_result.message_result)
 
 
 def create_corrupt_process_message(params, route, node_map, dest, msg, rand_reader):
@@ -287,6 +297,7 @@ def create_corrupt_process_message(params, route, node_map, dest, msg, rand_read
         delta = p.pi(p.create_block_cipher_key(secrets[i]), delta)
     alpha, beta, gamma = header
     return alpha, beta, gamma, delta
+
 
 def create_invalid_message(params, route, node_map, dest, msg, rand_reader):
     p = params
