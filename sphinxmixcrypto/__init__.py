@@ -10,11 +10,13 @@ from sphinxmixcrypto.node import generate_node_keypair, SphinxNodeState, SphinxP
 from sphinxmixcrypto.node import PacketReplayCacheDict, ReplayError, IncorrectMACError
 from sphinxmixcrypto.node import HeaderAlphaGroupMismatchError, DSPEC, destination_encode, InvalidProcessDestinationError
 from sphinxmixcrypto.node import InvalidMessageTypeError, UnwrappedMessage, SphinxBodySizeMismatchError
+from sphinxmixcrypto.node import SphinxParams
 from sphinxmixcrypto.crypto_primitives import GroupCurve25519, SphinxLioness, SphinxStreamCipher, SphinxDigest
 from sphinxmixcrypto.nym_server import Nymserver
 from sphinxmixcrypto.padding import add_padding, remove_padding
 
 __all__ = [
+    "SphinxParams",
     "SphinxBodySizeMismatchError",
     "UnwrappedMessage",
     "InvalidMessageTypeError",

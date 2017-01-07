@@ -27,8 +27,8 @@ import zope.interface
 
 from sphinxmixcrypto.padding import remove_padding
 from sphinxmixcrypto.common import IPacketReplayCache, ISphinxNodeState
-from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, GroupCurve25519, SphinxDigest, PAYLOAD_SIZE
-from sphinxmixcrypto.crypto_primitives import SphinxStreamCipher, SphinxLioness, xor
+from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, GroupCurve25519, SphinxDigest
+from sphinxmixcrypto.crypto_primitives import SphinxStreamCipher, SphinxLioness, xor, CURVE25519_SIZE
 
 
 class HeaderAlphaGroupMismatchError(Exception):
@@ -156,7 +156,15 @@ class PacketReplayCacheDict:
         self.cache = {}
 
 
-def sphinx_packet_unwrap(node_state, packet):
+class SphinxParams:
+
+    def __init__(self, max_hops, payload_size):
+        self.max_hops = max_hops
+        self.payload_size = payload_size
+        self.beta_cipher_size = CURVE25519_SIZE + (2 * max_hops + 1) * SECURITY_PARAMETER
+
+
+def sphinx_packet_unwrap(params, node_state, packet):
     """
     sphinx_packet_unwrap returns a UnwrappedMessage given a node_state
     and a packet or raises an exception if an error was encountered,
@@ -165,7 +173,7 @@ def sphinx_packet_unwrap(node_state, packet):
     """
 
     assert ISphinxNodeState.providedBy(node_state)
-    if len(packet.delta) != PAYLOAD_SIZE:
+    if len(packet.delta) != params.payload_size:
         raise SphinxBodySizeMismatchError()
     result = UnwrappedMessage()
     group = GroupCurve25519()
@@ -182,7 +190,7 @@ def sphinx_packet_unwrap(node_state, packet):
         raise IncorrectMACError()
     node_state.replay_cache.set_seen(tag)
     payload = block_cipher.decrypt(block_cipher.create_block_cipher_key(s), packet.delta)
-    B = xor(packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s)))
+    B = xor(packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s), params.beta_cipher_size))
     message_type, val, rest = prefix_free_decode(B)
 
     if message_type == "mix":

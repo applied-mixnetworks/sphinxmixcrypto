@@ -20,7 +20,7 @@ import os
 import binascii
 
 from sphinxmixcrypto.node import destination_encode, DSPEC
-from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, PAYLOAD_SIZE, MAX_HOPS, xor
+from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, xor
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxStreamCipher, SphinxDigest, GroupCurve25519
 from sphinxmixcrypto.padding import add_padding, remove_padding
 from sphinxmixcrypto.common import RandReader
@@ -38,16 +38,16 @@ def rand_subset(lst, nu):
     return [x[1] for x in nodeids[:nu]]
 
 
-def create_header(route, node_map, dest, message_id, rand_reader):
+def create_header(params, route, node_map, dest, message_id, rand_reader):
     route_len = len(route)
-    assert len(dest) <= 2 * (MAX_HOPS - route_len + 1) * SECURITY_PARAMETER
-    assert route_len <= MAX_HOPS
+    assert len(dest) <= 2 * (params.max_hops - route_len + 1) * SECURITY_PARAMETER
+    assert route_len <= params.max_hops
     assert len(message_id) == SECURITY_PARAMETER
     group = GroupCurve25519()
     digest = SphinxDigest()
     stream_cipher = SphinxStreamCipher()
     x = group.gensecret(rand_reader)
-    padding = rand_reader.read(((2 * (MAX_HOPS - route_len) + 2) * SECURITY_PARAMETER - len(dest)))
+    padding = rand_reader.read(((2 * (params.max_hops - route_len) + 2) * SECURITY_PARAMETER - len(dest)))
 
     # Compute the (alpha, s, b) tuples
     blinds = [x]
@@ -63,38 +63,38 @@ def create_header(route, node_map, dest, message_id, rand_reader):
     phi = b''
     stream_cipher = SphinxStreamCipher()
     for i in range(1, route_len):
-        min = (2 * (MAX_HOPS - i) + 3) * SECURITY_PARAMETER
+        min = (2 * (params.max_hops - i) + 3) * SECURITY_PARAMETER
         phi = xor(phi + (b"\x00" * (2 * SECURITY_PARAMETER)),
-                  stream_cipher.generate_stream(digest.create_stream_cipher_key(asbtuples[i - 1]['s']))[min:])
+                  stream_cipher.generate_stream(digest.create_stream_cipher_key(asbtuples[i - 1]['s']), params.beta_cipher_size)[min:])
 
     # Compute the (beta, gamma) tuples
     beta = dest + message_id + padding
     stream_key = digest.create_stream_cipher_key(asbtuples[route_len - 1]['s'])
     beta = xor(beta,
-               stream_cipher.generate_stream(stream_key)[:(2 * (MAX_HOPS - route_len) + 3) * SECURITY_PARAMETER]) + phi
+               stream_cipher.generate_stream(stream_key, (2 * (params.max_hops - route_len) + 3) * SECURITY_PARAMETER)[:(2 * (params.max_hops - route_len) + 3) * SECURITY_PARAMETER]) + phi
     gamma_key = digest.create_hmac_key(asbtuples[route_len - 1]['s'])
     gamma = digest.hmac(gamma_key, beta)
     for i in range(route_len - 2, -1, -1):
         message_id = route[i + 1]
         assert len(message_id) == SECURITY_PARAMETER
         stream_key = digest.create_stream_cipher_key(asbtuples[i]['s'])
-        beta = xor(message_id + gamma + beta[:(2 * MAX_HOPS - 1) * SECURITY_PARAMETER],
-                   stream_cipher.generate_stream(stream_key)[:(2 * MAX_HOPS + 1) * SECURITY_PARAMETER])
+        beta = xor(message_id + gamma + beta[:(2 * params.max_hops - 1) * SECURITY_PARAMETER],
+                   stream_cipher.generate_stream(stream_key, params.beta_cipher_size)[:(2 * params.max_hops + 1) * SECURITY_PARAMETER])
         gamma = digest.hmac(digest.create_hmac_key(asbtuples[i]['s']), beta)
     return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
 
 
-def create_forward_message(route, node_map, dest, msg, rand_reader):
+def create_forward_message(params, route, node_map, dest, msg, rand_reader):
     route_len = len(route)
     assert len(dest) < 128 and len(dest) > 0
-    assert SECURITY_PARAMETER + 1 + len(dest) + len(msg) < PAYLOAD_SIZE
+    assert SECURITY_PARAMETER + 1 + len(dest) + len(msg) < params.payload_size
     block_cipher = SphinxLioness()
 
     # Compute the header and the secrets
-    header, secrets = create_header(route, node_map, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
+    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
     encoded_dest = destination_encode(dest)
     body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
-    padded_body = add_padding(body, PAYLOAD_SIZE)
+    padded_body = add_padding(body, params.payload_size)
 
     # Compute the delta values
     block_cipher = SphinxLioness()
@@ -106,11 +106,11 @@ def create_forward_message(route, node_map, dest, msg, rand_reader):
     return alpha, beta, gamma, delta
 
 
-def create_surb(route, node_map, dest, rand_reader):
+def create_surb(params, route, node_map, dest, rand_reader):
     message_id = rand_reader.read(SECURITY_PARAMETER)
     block_cipher = SphinxLioness()
     # Compute the header and the secrets
-    header, secrets = create_header(route, node_map, destination_encode(dest), message_id, rand_reader)
+    header, secrets = create_header(params, route, node_map, destination_encode(dest), message_id, rand_reader)
 
     # ktilde is 32 bytes because our create_block_cipher_key
     # requires a 32 byte input. However in the Sphinx reference
@@ -136,7 +136,12 @@ class ClientMessage:
 
 
 class SphinxClient:
-    def __init__(self, id=None, rand_reader=None):
+    def __init__(self, params, id, rand_reader=None):
+        """
+        params is a SphinxParams, encapsulating max hops and payload
+        size, basically the dimensions of the Sphinx packet
+        """
+        self.params = params
         if rand_reader is None:
             self.rand_reader = RandReader()
         else:
@@ -151,7 +156,7 @@ class SphinxClient:
         """Create a SURB for the given nym (passing through nllength
         nodes), and send it to the nymserver."""
 
-        message_id, keytuple, nymtuple = create_surb(route, node_map, self.id, self.rand_reader)
+        message_id, keytuple, nymtuple = create_surb(self.params, route, node_map, self.id, self.rand_reader)
         self.keytable[message_id] = keytuple
         return nymtuple
 

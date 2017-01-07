@@ -37,14 +37,10 @@ HMAC_HASH_PREFIX = b'\x33'
 BLOCK_CIPHER_HASH_PREFIX = b'\x44'
 REPLAY_HASH_PREFIX = b'\x55'
 
+# curve25519 key is 32 bytes
+CURVE25519_SIZE = 32
 # Sphinx provides 128 bits of security as does curve25519
 SECURITY_PARAMETER = 16
-
-# the packet payload size
-PAYLOAD_SIZE = 1024  # XXX change me
-
-# maximum number of hops
-MAX_HOPS = 5  # XXX change me
 
 
 def xor(str1, str2):
@@ -131,14 +127,14 @@ class SphinxLioness:
 
 class SphinxStreamCipher:
 
-    def generate_stream(self, key):
+    def generate_stream(self, key, length):
         """
-        The PRG; key is 32 bytes, output is of length (2r+3)k
+        The PRG; key is 32 bytes, output is of size length
         """
         assert len(key) == 32
         nonce = b"\x00" * 8  # it's OK to use zero nonce because we only use it once
         c = ChaCha20.new(key=key, nonce=nonce)
-        return c.encrypt(b"\x00" * ((2 * MAX_HOPS + 3) * SECURITY_PARAMETER))
+        return c.encrypt(b"\x00" * length)
 
 
 class SphinxDigest:

@@ -1,4 +1,3 @@
-cbor
 tox
 coverage
 setuptools>=0.8.0
@@ -7,3 +6,4 @@ codecov
 wheel
 pyflakes
 pep8
+pytest
