@@ -159,6 +159,19 @@ class TestSphinxEnd2End():
         self.alice_client = SphinxClient(params, id=client_id,
                                          rand_reader=rand_reader)
 
+    def test_sphinx_replay(self):
+        rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
+
+        self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
+        message = b"the quick brown fox"
+        params = SphinxParams(5, 1024)
+        alpha, beta, gamma, delta = create_forward_message(params, self.route, self.consensus,
+                                                           self.route[-1], message, rand_reader)
+        packet = SphinxPacket(alpha, beta, gamma, delta)
+        sphinx_packet_unwrap(params, self.node_map[self.route[0]], packet)
+        py.test.raises(ReplayError, sphinx_packet_unwrap, params, self.node_map[self.route[0]], packet)
+        self.node_map[self.route[0]].replay_cache.flush()
+
     def test_client_surb(self):
         rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
 
