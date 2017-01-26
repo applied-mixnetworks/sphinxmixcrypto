@@ -163,6 +163,20 @@ class SphinxParams:
         self.payload_size = payload_size
         self.beta_cipher_size = CURVE25519_SIZE + (2 * max_hops + 1) * SECURITY_PARAMETER
 
+    def get_dimensions(self):
+        """
+        header overhead = p + (2r + 2)s
+        where p is the asymmetric element,
+        s is the symmetric element and
+        r is the max route length
+        alpha 32 beta 176 gamma 16 delta 1024
+        """
+        alpha = CURVE25519_SIZE
+        beta = (2 * self.max_hops + 1) * SECURITY_PARAMETER
+        gamma = SECURITY_PARAMETER
+        delta = self.payload_size
+        return alpha, beta, gamma, delta
+
 
 def sphinx_packet_unwrap(params, node_state, packet):
     """
