@@ -64,6 +64,15 @@ class DummyPKI(object):
         pass
 
 
+def test_sphinx_params():
+    params = SphinxParams(5, 1024)
+    alpha, beta, gamma, delta = params.get_dimensions()
+    assert alpha == 32
+    assert beta == 176
+    assert gamma == 16
+    assert delta == 1024
+
+
 class TestSphinxCorrectness():
 
     def newTestRoute(self, numHops):
@@ -109,6 +118,8 @@ class TestSphinxCorrectness():
         key_state = SphinxNodeKeyState(self.private_key_map[route[0]])
         sphinx_packet_unwrap(params, replay_cache, key_state, packet)
         py.test.raises(ReplayError, sphinx_packet_unwrap, params, replay_cache, key_state, packet)
+        replay_cache.flush()
+        sphinx_packet_unwrap(params, replay_cache, key_state, packet)
 
     def test_sphinx_assoc_data(self):
         route = self.newTestRoute(5)
