@@ -23,7 +23,7 @@ from sphinxmixcrypto.node import destination_encode, DSPEC
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, xor
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxStreamCipher, SphinxDigest, GroupCurve25519
 from sphinxmixcrypto.padding import add_padding, remove_padding
-from sphinxmixcrypto.common import RandReader
+from sphinxmixcrypto.common import RandReader, IMixPKI
 
 
 def rand_subset(lst, nu):
@@ -38,11 +38,13 @@ def rand_subset(lst, nu):
     return [x[1] for x in nodeids[:nu]]
 
 
-def create_header(params, route, node_map, dest, message_id, rand_reader):
+def create_header(params, route, pki, dest, message_id, rand_reader):
+    assert IMixPKI.providedBy(pki)
     route_len = len(route)
     assert len(dest) <= 2 * (params.max_hops - route_len + 1) * SECURITY_PARAMETER
     assert route_len <= params.max_hops
     assert len(message_id) == SECURITY_PARAMETER
+
     group = GroupCurve25519()
     digest = SphinxDigest()
     stream_cipher = SphinxStreamCipher()
@@ -52,9 +54,9 @@ def create_header(params, route, node_map, dest, message_id, rand_reader):
     # Compute the (alpha, s, b) tuples
     blinds = [x]
     asbtuples = []
-    for node in route:
+    for node_id in route:
         alpha = group.multiexpon(group.generator, blinds)
-        s = group.multiexpon(node_map[node], blinds)
+        s = group.multiexpon(pki.get(node_id), blinds)
         b = digest.hash_blinding(alpha, s)
         blinds.append(b)
         asbtuples.append({'alpha': alpha, 's': s, 'b': b})
@@ -84,14 +86,16 @@ def create_header(params, route, node_map, dest, message_id, rand_reader):
     return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
 
 
-def create_forward_message(params, route, node_map, dest, msg, rand_reader):
+def create_forward_message(params, route, pki, dest, msg, rand_reader):
+    assert IMixPKI.providedBy(pki)
+
     route_len = len(route)
     assert len(dest) < 128 and len(dest) > 0
     assert SECURITY_PARAMETER + 1 + len(dest) + len(msg) < params.payload_size
     block_cipher = SphinxLioness()
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
+    header, secrets = create_header(params, route, pki, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
     encoded_dest = destination_encode(dest)
     body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
     padded_body = add_padding(body, params.payload_size)
@@ -106,11 +110,13 @@ def create_forward_message(params, route, node_map, dest, msg, rand_reader):
     return alpha, beta, gamma, delta
 
 
-def create_surb(params, route, node_map, dest, rand_reader):
+def create_surb(params, route, pki, dest, rand_reader):
+    assert IMixPKI.providedBy(pki)
+
     message_id = rand_reader.read(SECURITY_PARAMETER)
     block_cipher = SphinxLioness()
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, node_map, destination_encode(dest), message_id, rand_reader)
+    header, secrets = create_header(params, route, pki, destination_encode(dest), message_id, rand_reader)
 
     # ktilde is 32 bytes because our create_block_cipher_key
     # requires a 32 byte input. However in the Sphinx reference
@@ -152,11 +158,14 @@ class SphinxClient:
             self.id = id
         self.keytable = {}
 
-    def create_nym(self, route, node_map):
-        """Create a SURB for the given nym (passing through nllength
-        nodes), and send it to the nymserver."""
+    def create_nym(self, route, pki):
+        """
+        Create a SURB for the given nym (passing through nllength
+        nodes), and send it to the nymserver.
+        """
+        assert IMixPKI.providedBy(pki)
 
-        message_id, keytuple, nymtuple = create_surb(self.params, route, node_map, self.id, self.rand_reader)
+        message_id, keytuple, nymtuple = create_surb(self.params, route, pki, self.id, self.rand_reader)
         self.keytable[message_id] = keytuple
         return nymtuple
 

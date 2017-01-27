@@ -20,6 +20,41 @@ import os
 import zope.interface
 
 
+class IMixPKI(zope.interface.Interface):
+    """
+    I am a mix network PKI interface. I'm only concerned
+    with public keys of mixnet nodes.
+    """
+    def set(self, key_id, pub_key):
+        """
+        if key_id isn't already present then set it's value to pub_key
+        """
+
+    def get(self, key_id):
+        """
+        given a key_id, a hash of a public key, return the public key
+        -> 32 byte key
+        """
+
+    def identities(self):
+        """
+        return a list of key ID's
+        -> [key_id]
+        """
+
+    def get_mix_addr(self, transport_name, key_id):
+        """
+        given a transport name and a key id return the connecting information
+        """
+
+    def rotate(self, key_id, new_key_id, new_pub_key, signature):
+        """
+        rotate mixnet node keys; I remove the old PKI entry (key_id, pub_key)
+        and replace it with the new_pub_key and new_key_id if the signature
+        can be verified using the old public key.
+        """
+
+
 class IPacketReplayCache(zope.interface.Interface):
     """
     Interface to a Sphinx packet replay tag cache which
@@ -43,14 +78,12 @@ class IPacketReplayCache(zope.interface.Interface):
         """
 
 
-class ISphinxNodeState(zope.interface.Interface):
-    """
-    Interface for a class providing Sphinx mix node state.
-    """
-    replay_cache = zope.interface.Attribute("""replay_cache IPacketReplayCache""")
-    zope.interface.invariant(IPacketReplayCache.providedBy(replay_cache))
-    public_key = zope.interface.Attribute("""public_key 32 byte public key""")
-    private_key = zope.interface.Attribute("""private_key 32 byte private key""")
+class IMixPrivateKey(zope.interface.Interface):
+
+    def get_private_key(self):
+        """
+        return the private key, a 32 byte value
+        """
 
 
 class RandReader:

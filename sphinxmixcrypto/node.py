@@ -26,7 +26,7 @@ import binascii
 import zope.interface
 
 from sphinxmixcrypto.padding import remove_padding
-from sphinxmixcrypto.common import IPacketReplayCache, ISphinxNodeState
+from sphinxmixcrypto.common import IPacketReplayCache, IMixPrivateKey
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, GroupCurve25519, SphinxDigest
 from sphinxmixcrypto.crypto_primitives import SphinxStreamCipher, SphinxLioness, xor, CURVE25519_SIZE
 
@@ -129,17 +129,6 @@ class UnwrappedMessage:
         self.tuple_client_hop = ()
 
 
-@zope.interface.implementer(ISphinxNodeState)
-class SphinxNodeState:
-
-    def __init__(self, id, name, public_key, private_key, replay_cache):
-        self.id = id
-        self.name = name
-        self.public_key = public_key
-        self.private_key = private_key
-        self.replay_cache = replay_cache
-
-
 @zope.interface.implementer(IPacketReplayCache)
 class PacketReplayCacheDict:
 
@@ -178,15 +167,15 @@ class SphinxParams:
         return alpha, beta, gamma, delta
 
 
-def sphinx_packet_unwrap(params, node_state, packet):
+def sphinx_packet_unwrap(params, replay_cache, private_key, packet):
     """
-    sphinx_packet_unwrap returns a UnwrappedMessage given a node_state
-    and a packet or raises an exception if an error was encountered,
-    where the node_state provides the ISphinxNodeState interface and
-    the packet is an instance of SphinxPacket.
+    sphinx_packet_unwrap returns a UnwrappedMessage given the replay
+    cache, private key and a packet or raises an exception if an error
+    was encountered
     """
+    assert IPacketReplayCache.providedBy(replay_cache)
+    assert IMixPrivateKey.providedBy(private_key)
 
-    assert ISphinxNodeState.providedBy(node_state)
     if len(packet.delta) != params.payload_size:
         raise SphinxBodySizeMismatchError()
     result = UnwrappedMessage()
@@ -196,13 +185,13 @@ def sphinx_packet_unwrap(params, node_state, packet):
     block_cipher = SphinxLioness()
     if not group.in_group(packet.alpha):
         raise HeaderAlphaGroupMismatchError()
-    s = group.expon(packet.alpha, node_state.private_key)
+    s = group.expon(packet.alpha, private_key.get_private_key())
     tag = digest.hash_replay(s)
-    if node_state.replay_cache.has_seen(tag):
+    if replay_cache.has_seen(tag):
         raise ReplayError()
     if packet.gamma != digest.hmac(digest.create_hmac_key(s), packet.beta):
         raise IncorrectMACError()
-    node_state.replay_cache.set_seen(tag)
+    replay_cache.set_seen(tag)
     payload = block_cipher.decrypt(block_cipher.create_block_cipher_key(s), packet.delta)
     B = xor(packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s), params.beta_cipher_size))
     message_type, val, rest = prefix_free_decode(B)

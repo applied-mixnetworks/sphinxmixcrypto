@@ -1,15 +1,16 @@
 
 import py.test
+import zope.interface
 import binascii
 
 from sphinxmixcrypto.crypto_primitives import SphinxLioness
 from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket, generate_node_keypair, generate_node_id_name
 from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, SECURITY_PARAMETER, create_header, DSPEC
-from sphinxmixcrypto import SphinxNodeState, IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
+from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
 from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError, SphinxBodySizeMismatchError
 from sphinxmixcrypto.node import SphinxParams
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message
-from sphinxmixcrypto.common import RandReader
+from sphinxmixcrypto.common import RandReader, IMixPKI, IMixPrivateKey
 from sphinxmixcrypto.nym_server import Nymserver
 
 
@@ -30,21 +31,52 @@ class FixedNoiseReader():
         return ret
 
 
+@zope.interface.implementer(IMixPrivateKey)
+class SphinxNodeKeyState:
+
+    def __init__(self, private_key):
+        self.private_key = private_key
+
+    def get_private_key(self):
+        return self.private_key
+
+
+@zope.interface.implementer(IMixPKI)
+class DummyPKI(object):
+
+    def __init__(self):
+        self.node_map = {}
+
+    def set(self, key_id, pub_key):
+        assert key_id not in self.node_map.keys()
+        self.node_map[key_id] = pub_key
+
+    def get(self, key_id):
+        return self.node_map[key_id]
+
+    def identities(self):
+        return self.node_map.keys()
+
+    def get_mix_addr(self, transport_name, key_id):
+        return "dummyaddr"
+
+    def rotate(self, key_id, new_key_id, new_pub_key, signature):
+        pass
+
+
 class TestSphinxCorrectness():
 
     def newTestRoute(self, numHops):
         self.r = numHops
-        self.node_map = {}
-        self.consensus = {}
+        self.pki = DummyPKI()
         rand_reader = RandReader()
+        self.private_key_map = {}
         for i in range(numHops):
             public_key, private_key = generate_node_keypair(rand_reader)
             id, name = generate_node_id_name(SECURITY_PARAMETER, rand_reader)
-            replay_cache = PacketReplayCacheDict()
-            node_keys = SphinxNodeState(id, name, public_key, private_key, replay_cache)
-            self.node_map[node_keys.id] = node_keys
-            self.consensus[node_keys.id] = node_keys.public_key
-        route = rand_subset(self.node_map.keys(), self.r)
+            self.pki.set(id, public_key)
+            self.private_key_map[id] = private_key
+        route = rand_subset(self.pki.identities(), numHops)
         return route
 
     def test_sphinx_single_hop(self):
@@ -53,9 +85,11 @@ class TestSphinxCorrectness():
         message = b"this is a test"
         rand_reader = RandReader()
         params = SphinxParams(5, 1024)
-        alpha, beta, gamma, delta = create_forward_message(params, route, self.consensus, destination, message, rand_reader)
+        alpha, beta, gamma, delta = create_forward_message(params, route, self.pki, destination, message, rand_reader)
         packet = SphinxPacket(alpha, beta, gamma, delta)
-        result = sphinx_packet_unwrap(params, self.node_map[route[0]], packet)
+        replay_cache = PacketReplayCacheDict()
+        key_state = SphinxNodeKeyState(self.private_key_map[route[0]])
+        result = sphinx_packet_unwrap(params, replay_cache, key_state, packet)
         assert len(result.tuple_exit_hop) == 2
         assert len(result.tuple_next_hop) == 0
         assert len(result.tuple_client_hop) == 0
@@ -69,11 +103,12 @@ class TestSphinxCorrectness():
         message = b"this is a test"
         rand_reader = RandReader()
         params = SphinxParams(5, 1024)
-        alpha, beta, gamma, delta = create_forward_message(params, route, self.consensus, destination, message, rand_reader)
+        alpha, beta, gamma, delta = create_forward_message(params, route, self.pki, destination, message, rand_reader)
         packet = SphinxPacket(alpha, beta, gamma, delta)
-        sphinx_packet_unwrap(params, self.node_map[route[0]], packet)
-        py.test.raises(ReplayError, sphinx_packet_unwrap, params, self.node_map[route[0]], packet)
-        self.node_map[route[0]].replay_cache.flush()
+        replay_cache = PacketReplayCacheDict()
+        key_state = SphinxNodeKeyState(self.private_key_map[route[0]])
+        sphinx_packet_unwrap(params, replay_cache, key_state, packet)
+        py.test.raises(ReplayError, sphinx_packet_unwrap, params, replay_cache, key_state, packet)
 
     def test_sphinx_assoc_data(self):
         route = self.newTestRoute(5)
@@ -81,9 +116,11 @@ class TestSphinxCorrectness():
         message = b"this is a test"
         rand_reader = RandReader()
         params = SphinxParams(5, 1024)
-        alpha, beta, gamma, delta = create_forward_message(params, route, self.consensus, destination, message, rand_reader)
+        alpha, beta, gamma, delta = create_forward_message(params, route, self.pki, destination, message, rand_reader)
         packet = SphinxPacket(alpha, beta, gamma, b"somethingelse!!!!!!!!!!!!!!")
-        py.test.raises(SphinxBodySizeMismatchError, sphinx_packet_unwrap, params, self.node_map[route[0]], packet)
+        replay_cache = PacketReplayCacheDict()
+        key_state = SphinxNodeKeyState(self.private_key_map[route[0]])
+        py.test.raises(SphinxBodySizeMismatchError, sphinx_packet_unwrap, params, replay_cache, key_state, packet)
 
     def test_sphinx_corrupt_mac(self):
         route = self.newTestRoute(5)
@@ -91,9 +128,12 @@ class TestSphinxCorrectness():
         message = b"this is a test"
         rand_reader = RandReader()
         params = SphinxParams(5, 1024)
-        alpha, beta, gamma, delta = create_forward_message(params, route, self.consensus, destination, message, rand_reader)
+        alpha, beta, gamma, delta = create_forward_message(params, route, self.pki, destination, message, rand_reader)
         packet = SphinxPacket(alpha, beta, b"somethingelse!!!!!!!!!!!!!!", delta)
-        py.test.raises(IncorrectMACError, sphinx_packet_unwrap, params, self.node_map[route[0]], packet)
+        replay_cache = PacketReplayCacheDict()
+        public_key, private_key = generate_node_keypair(rand_reader)
+        key_state = SphinxNodeKeyState(private_key)
+        py.test.raises(IncorrectMACError, sphinx_packet_unwrap, params, replay_cache, key_state, packet)
 
     def test_sphinx_alpha_too_big(self):
         route = self.newTestRoute(5)
@@ -101,10 +141,13 @@ class TestSphinxCorrectness():
         message = b"this is a test"
         rand_reader = RandReader()
         params = SphinxParams(5, 1024)
-        alpha, beta, gamma, delta = create_forward_message(params, route, self.consensus, destination, message, rand_reader)
+        alpha, beta, gamma, delta = create_forward_message(params, route, self.pki, destination, message, rand_reader)
         alpha = alpha + b"A"
         packet = SphinxPacket(alpha, beta, gamma, delta)
-        py.test.raises(HeaderAlphaGroupMismatchError, sphinx_packet_unwrap, params, self.node_map[route[0]], packet)
+        replay_cache = PacketReplayCacheDict()
+        public_key, private_key = generate_node_keypair(rand_reader)
+        key_state = SphinxNodeKeyState(private_key)
+        py.test.raises(HeaderAlphaGroupMismatchError, sphinx_packet_unwrap, params, replay_cache, key_state, packet)
 
 
 class TestSphinxEnd2End():
@@ -139,21 +182,23 @@ class TestSphinxEnd2End():
 
         ]
         self.r = 5
-        self.node_map = {}
-        self.consensus = {}
+        self.pki = DummyPKI()
         self.route = []
         params = SphinxParams(5, 1024)
         self.nymserver = Nymserver(params)
+        self.private_key_map = {}
+        self.key_state_map = {}
+        self.replay_cache_map = {}
 
         # Create some nodes
         for i in range(len(hexedState)):
+            self.route.append(hexedState[i]['id'])
+            self.pki.set(hexedState[i]['id'], hexedState[i]['public_key'])
+            self.private_key_map[hexedState[i]['id']] = hexedState[i]['private_key']
             replay_cache = PacketReplayCacheDict()
-            name = None
-            state = SphinxNodeState(hexedState[i]['id'], name, hexedState[i]['public_key'], hexedState[i]['private_key'], replay_cache)
-            self.route.append(state.id)
-            self.node_map[state.id] = state
-            self.consensus[state.id] = state.public_key
-
+            self.replay_cache_map[hexedState[i]['id']] = replay_cache
+            key_state = SphinxNodeKeyState(hexedState[i]['private_key'])
+            self.key_state_map[hexedState[i]['id']] = key_state
         # Create a client
         params = SphinxParams(5, 1024)
         self.alice_client = SphinxClient(params, id=client_id,
@@ -165,19 +210,21 @@ class TestSphinxEnd2End():
         self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
-        alpha, beta, gamma, delta = create_forward_message(params, self.route, self.consensus,
+        alpha, beta, gamma, delta = create_forward_message(params, self.route, self.pki,
                                                            self.route[-1], message, rand_reader)
         packet = SphinxPacket(alpha, beta, gamma, delta)
-        sphinx_packet_unwrap(params, self.node_map[self.route[0]], packet)
-        py.test.raises(ReplayError, sphinx_packet_unwrap, params, self.node_map[self.route[0]], packet)
-        self.node_map[self.route[0]].replay_cache.flush()
+        replay_cache = PacketReplayCacheDict()
+        key_state = SphinxNodeKeyState(self.private_key_map[self.route[0]])
+
+        sphinx_packet_unwrap(params, replay_cache, key_state, packet)
+        py.test.raises(ReplayError, sphinx_packet_unwrap, params, replay_cache, key_state, packet)
 
     def test_client_surb(self):
         rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
 
         self.setUpMixVectors(rand_reader)
         nym_id = b"Cypherpunk"
-        nym_tuple = self.alice_client.create_nym(self.route, self.consensus)
+        nym_tuple = self.alice_client.create_nym(self.route, self.pki)
         self.nymserver.add_surb(nym_id, nym_tuple)
         message = b"Open, secure and reliable connectivity is necessary (although not sufficient) to excercise the human rights such as freedom of expression and freedom of association [FOC], as defined in the Universal Declaration of Human Rights [UDHR]."
 
@@ -222,17 +269,19 @@ class TestSphinxEnd2End():
         return self.alice_client.decrypt(message_id, delta)
 
     def send_to_mix(self, params, destination, packet):
-        return sphinx_packet_unwrap(params, self.node_map[destination], packet)
+        return sphinx_packet_unwrap(params, self.replay_cache_map[destination], self.key_state_map[destination], packet)
 
     def test_end_to_end(self):
         rand_reader = FixedNoiseReader("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b43c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
         self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
-        alpha, beta, gamma, delta = create_forward_message(params, self.route, self.consensus,
+        alpha, beta, gamma, delta = create_forward_message(params, self.route, self.pki,
                                                            self.route[-1], message, rand_reader)
+        replay_cache = PacketReplayCacheDict()
+        key_state = SphinxNodeKeyState(self.private_key_map[self.route[0]])
         packet = SphinxPacket(alpha, beta, gamma, delta)
-        result = sphinx_packet_unwrap(params, self.node_map[self.route[0]], packet)
+        result = sphinx_packet_unwrap(params, replay_cache, key_state, packet)
         self.alpha = binascii.unhexlify("b9bc2a81df782c98a8e2b8560dc50647e2f3c013ed563b021df3e0b45378d66c")
         self.beta = binascii.unhexlify("9f486475acc1bd3bc551700f58108ea4029a250b5e893eaaf8aeb0811d84094816b3904f69d45921448454de0eb18bfda49832492a127a5682231d3848a3cb06ca17c3427063f80d662997b30bc9307a676cd6972716d1d6ee59b657f368b0fdb0245872e5157dd3de788341518c328395b415b516bd47efb86302edf840eebd9de432e08d6b9fddd4d55f75112332e403d78e536193aa172c0dbffbc9631d8c877214abef61d54bd0a35114e5f0eace")
         self.gamma = binascii.unhexlify("59f86271afb940c9e7c187b9966b9a42")
@@ -261,9 +310,11 @@ class TestSphinxEnd2End():
         message = b"this is a test"
         rand_reader = RandReader()
         params = SphinxParams(5, 1024)
-        alpha, beta, gamma, delta = create_corrupt_process_message(params, self.route, self.consensus, destination, message, rand_reader)
+        alpha, beta, gamma, delta = create_corrupt_process_message(params, self.route, self.pki, destination, message, rand_reader)
         packet = SphinxPacket(alpha, beta, gamma, delta)
-        result = sphinx_packet_unwrap(params, self.node_map[self.route[0]], packet)
+        replay_cache = PacketReplayCacheDict()
+        key_state = SphinxNodeKeyState(self.private_key_map[self.route[0]])
+        result = sphinx_packet_unwrap(params, replay_cache, key_state, packet)
         py.test.raises(InvalidProcessDestinationError, self.mixnet_test_corrupted_packet_state_machine, params, result)
 
     def test_sphinx_invalid_message(self):
@@ -271,10 +322,12 @@ class TestSphinxEnd2End():
         self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
-        alpha, beta, gamma, delta = create_invalid_message(params, self.route, self.consensus,
+        alpha, beta, gamma, delta = create_invalid_message(params, self.route, self.pki,
                                                            self.route[-1], message, rand_reader)
         packet = SphinxPacket(alpha, beta, gamma, delta)
-        result = sphinx_packet_unwrap(params, self.node_map[self.route[0]], packet)
+        replay_cache = PacketReplayCacheDict()
+        key_state = SphinxNodeKeyState(self.private_key_map[self.route[0]])
+        result = sphinx_packet_unwrap(params, replay_cache, key_state, packet)
         py.test.raises(InvalidMessageTypeError, self.mixnet_test_corrupted_packet_state_machine, params, result)
 
 
