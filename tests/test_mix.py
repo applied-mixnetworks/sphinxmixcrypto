@@ -9,7 +9,7 @@ from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, SECURITY_PARAMET
 from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
 from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError, SphinxBodySizeMismatchError
 from sphinxmixcrypto.node import SphinxParams
-from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message, NymKeyNotFoundError
+from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message, NymKeyNotFoundError, CorruptMessageError
 from sphinxmixcrypto.common import RandReader, IMixPKI, IMixPrivateKey
 from sphinxmixcrypto.nym_server import Nymserver
 
@@ -383,6 +383,14 @@ def create_invalid_message(params, route, node_map, dest, msg, rand_reader):
 
 def test_client_invalid_key():
     params = SphinxParams(5, 1024)
-    client_id = "fake client id"
-    client = SphinxClient(params, id = client_id)
-    py.test.raises(NymKeyNotFoundError, client.decrypt, client_id, "fake delta")
+    message_id = "fake message id"
+    client = SphinxClient(params, id="client id")
+    py.test.raises(NymKeyNotFoundError, client.decrypt, message_id, "fake delta")
+
+
+def test_client_corrupt_message():
+    params = SphinxParams(5, 1024)
+    message_id = "fake message id"
+    client = SphinxClient(params, id="client id")
+    client.keytable[message_id] = ["A" * 32]
+    py.test.raises(CorruptMessageError, client.decrypt, message_id, "A" * 1024)

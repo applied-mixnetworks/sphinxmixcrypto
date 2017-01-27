@@ -5,6 +5,7 @@ using the Sphinx mix network cryptographic packet format
 """
 
 from sphinxmixcrypto.client import SphinxClient, create_forward_message, rand_subset, create_header
+from sphinxmixcrypto.client import CorruptMessageError, NymKeyNotFoundError
 from sphinxmixcrypto.node import sphinx_packet_unwrap, generate_node_id, generate_node_id_name, prefix_free_decode
 from sphinxmixcrypto.node import generate_node_keypair, SphinxPacket, SECURITY_PARAMETER
 from sphinxmixcrypto.node import PacketReplayCacheDict, ReplayError, IncorrectMACError
@@ -17,6 +18,8 @@ from sphinxmixcrypto.padding import add_padding, remove_padding
 from sphinxmixcrypto.common import RandReader, IMixPKI, IPacketReplayCache, IMixPrivateKey
 
 __all__ = [
+    "NymKeyNotFoundError",
+    "CorruptMessageError",
     "RandReader",
     "IMixPKI",
     "IPacketReplayCache",

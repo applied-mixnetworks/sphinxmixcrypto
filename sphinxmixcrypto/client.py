@@ -182,7 +182,9 @@ class SphinxClient:
         route_len = len(keytuple)
         for i in range(route_len - 1, -1, -1):
             delta = block_cipher.encrypt(keytuple[i], delta)
-        delta = block_cipher.decrypt(block_cipher.create_block_cipher_key(ktilde), delta)
+        delta = block_cipher.decrypt(
+            block_cipher.create_block_cipher_key(ktilde), delta
+        )
 
         if delta[:SECURITY_PARAMETER] == (b"\x00" * SECURITY_PARAMETER):
             msg = remove_padding(delta[SECURITY_PARAMETER:])
