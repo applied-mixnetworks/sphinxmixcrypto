@@ -11,7 +11,7 @@ from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, Invalid
 from sphinxmixcrypto.node import SphinxParams
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message, NymKeyNotFoundError, CorruptMessageError
 from sphinxmixcrypto.common import RandReader, IMixPKI, IMixPrivateKey
-from sphinxmixcrypto.nym_server import Nymserver
+from sphinxmixcrypto.nym_server import Nymserver, SphinxNoSURBSAvailableError
 
 
 class FixedNoiseReader():
@@ -390,7 +390,16 @@ def test_client_invalid_key():
 
 def test_client_corrupt_message():
     params = SphinxParams(5, 1024)
-    message_id = "fake message id"
-    client = SphinxClient(params, id="client id")
-    client.keytable[message_id] = ["A" * 32]
-    py.test.raises(CorruptMessageError, client.decrypt, message_id, "A" * 1024)
+    message_id = b"fake message id"
+    client = SphinxClient(params, id=b"client id")
+    client.keytable[message_id] = [b"A" * 32]
+    py.test.raises(CorruptMessageError, client.decrypt, message_id, b"A" * 1024)
+
+
+def test_nymserver_no_such_surb():
+    params = SphinxParams(5, 1024)
+    nymserver = Nymserver(params)
+    nymtuple = (1, 2, 3)
+    nymserver.add_surb("nym", nymtuple)
+    nymserver.add_surb("nym", nymtuple)
+    py.test.raises(SphinxNoSURBSAvailableError, nymserver.process, "non-existent nym", "fake message")
