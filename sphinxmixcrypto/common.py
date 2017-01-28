@@ -25,9 +25,9 @@ class IMixPKI(zope.interface.Interface):
     I am a mix network PKI interface. I'm only concerned
     with public keys of mixnet nodes.
     """
-    def set(self, key_id, pub_key):
+    def set(self, key_id, pub_key, addr):
         """
-        if key_id isn't already present then set it's value to pub_key
+        if key_id isn't already present then set an associated public key and connecting address
         """
 
     def get(self, key_id):
@@ -42,9 +42,9 @@ class IMixPKI(zope.interface.Interface):
         -> [key_id]
         """
 
-    def get_mix_addr(self, transport_name, key_id):
+    def get_mix_addr(self, transport_name, node_id):
         """
-        given a transport name and a key id return the connecting information
+        given a node id and a transport name return the connecting information
         """
 
     def rotate(self, key_id, new_key_id, new_pub_key, signature):

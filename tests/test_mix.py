@@ -46,10 +46,12 @@ class DummyPKI(object):
 
     def __init__(self):
         self.node_map = {}
+        self.addr_map = {}
 
-    def set(self, key_id, pub_key):
+    def set(self, key_id, pub_key, addr):
         assert key_id not in self.node_map.keys()
         self.node_map[key_id] = pub_key
+        self.addr_map[key_id] = addr
 
     def get(self, key_id):
         return self.node_map[key_id]
@@ -58,7 +60,7 @@ class DummyPKI(object):
         return self.node_map.keys()
 
     def get_mix_addr(self, transport_name, key_id):
-        return "dummyaddr"
+        return self.addr_map[key_id]
 
     def rotate(self, key_id, new_key_id, new_pub_key, signature):
         pass
@@ -83,7 +85,7 @@ class TestSphinxCorrectness():
         for i in range(numHops):
             public_key, private_key = generate_node_keypair(rand_reader)
             id, name = generate_node_id_name(SECURITY_PARAMETER, rand_reader)
-            self.pki.set(id, public_key)
+            self.pki.set(id, public_key, i)
             self.private_key_map[id] = private_key
         route = rand_subset(self.pki.identities(), numHops)
         return route
@@ -204,7 +206,7 @@ class TestSphinxEnd2End():
         # Create some nodes
         for i in range(len(hexedState)):
             self.route.append(hexedState[i]['id'])
-            self.pki.set(hexedState[i]['id'], hexedState[i]['public_key'])
+            self.pki.set(hexedState[i]['id'], hexedState[i]['public_key'], i)
             self.private_key_map[hexedState[i]['id']] = hexedState[i]['private_key']
             replay_cache = PacketReplayCacheDict()
             self.replay_cache_map[hexedState[i]['id']] = replay_cache
