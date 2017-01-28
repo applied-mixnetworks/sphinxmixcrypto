@@ -4,6 +4,14 @@ sphinxmixcrypto is a crypto library for writing mix nets
 using the Sphinx mix network cryptographic packet format
 """
 
+from __future__ import absolute_import
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import with_statement
+
+from pylioness._metadata import __version__, __author__, __contact__
+from pylioness._metadata import __license__, __copyright__, __url__
+
 from sphinxmixcrypto.client import SphinxClient, create_forward_message, rand_subset, create_header
 from sphinxmixcrypto.client import CorruptMessageError, NymKeyNotFoundError
 from sphinxmixcrypto.node import sphinx_packet_unwrap, generate_node_id, generate_node_id_name, prefix_free_decode
@@ -54,4 +62,7 @@ __all__ = [
     "SphinxLioness",
     "SphinxStreamCipher",
     "SphinxDigest",
+
+    "__version__", "__author__", "__contact__",
+    "__license__", "__copyright__", "__url__",
 ]
