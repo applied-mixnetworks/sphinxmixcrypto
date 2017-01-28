@@ -12,6 +12,11 @@ from sphinxmixcrypto.node import SphinxParams
 from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message, NymKeyNotFoundError, CorruptMessageError
 from sphinxmixcrypto.common import RandReader, IMixPKI, IMixPrivateKey
 from sphinxmixcrypto.nym_server import Nymserver, SphinxNoSURBSAvailableError
+from sphinxmixcrypto import _metadata
+
+
+def use_metadata():
+    return _metadata.__version__
 
 
 class FixedNoiseReader():
