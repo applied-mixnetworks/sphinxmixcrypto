@@ -2,6 +2,10 @@
 sphinx mix network crypto for python
 ====================================
 
+.. image:: http://img.shields.io/pypi/v/sphinxmixcrypto.svg
+   :target: https://pypi.python.org/pypi/sphinxmixcrypto
+   :alt: PyPI Package
+
 .. image:: https://travis-ci.org/applied-mixnetworks/sphinxmixcrypto.png?branch=master
     :target: https://www.travis-ci.org/applied-mixnetworks/sphinxmixcrypto/
     :alt: travis
