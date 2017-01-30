@@ -124,7 +124,7 @@ class PacketReplayCacheDict:
         self.cache = {}
 
 
-def sphinx_packet_unwrap(params, replay_cache, private_key, packet):
+def sphinx_packet_unwrap(params, replay_cache, private_key, sphinx_packet):
     """
     sphinx_packet_unwrap returns a UnwrappedMessage given the replay
     cache, private key and a packet or raises an exception if an error
@@ -132,30 +132,31 @@ def sphinx_packet_unwrap(params, replay_cache, private_key, packet):
     """
     assert IPacketReplayCache.providedBy(replay_cache)
     assert IMixPrivateKey.providedBy(private_key)
+    assert isinstance(sphinx_packet, SphinxPacket)
 
-    if len(packet.delta) != params.payload_size:
+    if len(sphinx_packet.delta) != params.payload_size:
         raise SphinxBodySizeMismatchError()
     result = UnwrappedMessage()
     group = GroupCurve25519()
     digest = SphinxDigest()
     stream_cipher = SphinxStreamCipher()
     block_cipher = SphinxLioness()
-    if not group.in_group(packet.alpha):
+    if not group.in_group(sphinx_packet.alpha):
         raise HeaderAlphaGroupMismatchError()
-    s = group.expon(packet.alpha, private_key.get_private_key())
+    s = group.expon(sphinx_packet.alpha, private_key.get_private_key())
     tag = digest.hash_replay(s)
     if replay_cache.has_seen(tag):
         raise ReplayError()
-    if packet.gamma != digest.hmac(digest.create_hmac_key(s), packet.beta):
+    if sphinx_packet.gamma != digest.hmac(digest.create_hmac_key(s), sphinx_packet.beta):
         raise IncorrectMACError()
     replay_cache.set_seen(tag)
-    payload = block_cipher.decrypt(block_cipher.create_block_cipher_key(s), packet.delta)
-    B = xor(packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s), params.get_beta_cipher_size()))
+    payload = block_cipher.decrypt(block_cipher.create_block_cipher_key(s), sphinx_packet.delta)
+    B = xor(sphinx_packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s), params.get_beta_cipher_size()))
     message_type, val, rest = prefix_free_decode(B)
 
     if message_type == "mix":
-        b = digest.hash_blinding(packet.alpha, s)
-        alpha = group.expon(packet.alpha, b)
+        b = digest.hash_blinding(sphinx_packet.alpha, s)
+        alpha = group.expon(sphinx_packet.alpha, b)
         gamma = B[SECURITY_PARAMETER:SECURITY_PARAMETER * 2]
         beta = B[SECURITY_PARAMETER * 2:]
         result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
