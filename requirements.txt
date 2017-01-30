@@ -5,3 +5,4 @@ pycrypto>=2.6.1
 PyNaCl>=1.0.1
 pyblake2>=0.9.3
 zope.interface>=4.3.2
+attrs>=16.3.0

@@ -12,13 +12,15 @@ from __future__ import with_statement
 from pylioness._metadata import __version__, __author__, __contact__
 from pylioness._metadata import __license__, __copyright__, __url__
 
-from sphinxmixcrypto.client import SphinxClient, create_forward_message, rand_subset, create_header
-from sphinxmixcrypto.client import CorruptMessageError, NymKeyNotFoundError
+from sphinxmixcrypto.errors import CorruptMessageError, NymKeyNotFoundError, IncorrectMACError
+from sphinxmixcrypto.errors import ReplayError, HeaderAlphaGroupMismatchError, InvalidMessageTypeError, SphinxBodySizeMismatchError
+from sphinxmixcrypto.client import SphinxClient, create_forward_message, create_header
+#from sphinxmixcrypto.client import CorruptMessageError, NymKeyNotFoundError
 from sphinxmixcrypto.node import sphinx_packet_unwrap, generate_node_id, generate_node_id_name, prefix_free_decode
 from sphinxmixcrypto.node import generate_node_keypair, SphinxPacket, SECURITY_PARAMETER
-from sphinxmixcrypto.node import PacketReplayCacheDict, ReplayError, IncorrectMACError
-from sphinxmixcrypto.node import HeaderAlphaGroupMismatchError, DSPEC, destination_encode, InvalidProcessDestinationError
-from sphinxmixcrypto.node import InvalidMessageTypeError, UnwrappedMessage, SphinxBodySizeMismatchError
+from sphinxmixcrypto.node import PacketReplayCacheDict
+from sphinxmixcrypto.node import DSPEC, destination_encode, InvalidProcessDestinationError
+from sphinxmixcrypto.node import UnwrappedMessage
 from sphinxmixcrypto.node import SphinxParams
 from sphinxmixcrypto.crypto_primitives import GroupCurve25519, SphinxLioness, SphinxStreamCipher, SphinxDigest
 from sphinxmixcrypto.nym_server import Nymserver
@@ -57,7 +59,6 @@ __all__ = [
     "Nymserver",
     "SphinxClient",
     "create_forward_message",
-    "rand_subset",
     "GroupCurve25519",
     "SphinxLioness",
     "SphinxStreamCipher",

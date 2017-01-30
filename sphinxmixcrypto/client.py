@@ -16,26 +16,14 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-import os
 import binascii
 
-from sphinxmixcrypto.node import destination_encode, DSPEC
+from sphinxmixcrypto.node import destination_encode, DSPEC, SphinxParams
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, xor
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxStreamCipher, SphinxDigest, GroupCurve25519
 from sphinxmixcrypto.padding import add_padding, remove_padding
 from sphinxmixcrypto.common import RandReader, IMixPKI
-
-
-def rand_subset(lst, nu):
-    """
-    Return a list of nu random elements of the given list (without
-    replacement).
-    """
-    # Randomize the order of the list by sorting on a random key
-    nodeids = [(os.urandom(8), x) for x in lst]
-    nodeids.sort(key=lambda x: x[0])
-    # Return the first nu elements of the randomized list
-    return [x[1] for x in nodeids[:nu]]
+from sphinxmixcrypto.errors import NymKeyNotFoundError, CorruptMessageError
 
 
 def create_header(params, route, pki, dest, message_id, rand_reader):
@@ -67,7 +55,7 @@ def create_header(params, route, pki, dest, message_id, rand_reader):
     for i in range(1, route_len):
         min = (2 * (params.max_hops - i) + 3) * SECURITY_PARAMETER
         phi = xor(phi + (b"\x00" * (2 * SECURITY_PARAMETER)),
-                  stream_cipher.generate_stream(digest.create_stream_cipher_key(asbtuples[i - 1]['s']), params.beta_cipher_size)[min:])
+                  stream_cipher.generate_stream(digest.create_stream_cipher_key(asbtuples[i - 1]['s']), params.get_beta_cipher_size())[min:])
 
     # Compute the (beta, gamma) tuples
     beta = dest + message_id + padding
@@ -81,7 +69,7 @@ def create_header(params, route, pki, dest, message_id, rand_reader):
         assert len(message_id) == SECURITY_PARAMETER
         stream_key = digest.create_stream_cipher_key(asbtuples[i]['s'])
         beta = xor(message_id + gamma + beta[:(2 * params.max_hops - 1) * SECURITY_PARAMETER],
-                   stream_cipher.generate_stream(stream_key, params.beta_cipher_size)[:(2 * params.max_hops + 1) * SECURITY_PARAMETER])
+                   stream_cipher.generate_stream(stream_key, params.get_beta_cipher_size())[:(2 * params.max_hops + 1) * SECURITY_PARAMETER])
         gamma = digest.hmac(digest.create_hmac_key(asbtuples[i]['s']), beta)
     return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
 
@@ -128,14 +116,6 @@ def create_surb(params, route, pki, dest, rand_reader):
     return message_id, keytuple, (route[0], header, ktilde)
 
 
-class NymKeyNotFoundError(Exception):
-    pass
-
-
-class CorruptMessageError(Exception):
-    pass
-
-
 class ClientMessage:
     def __init__(self):
         self.payload = None
@@ -144,9 +124,12 @@ class ClientMessage:
 class SphinxClient:
     def __init__(self, params, id, rand_reader=None):
         """
-        params is a SphinxParams, encapsulating max hops and payload
-        size, basically the dimensions of the Sphinx packet
+        params is an instance of SphinxParams, encapsulating max hops
+        and payload size and a couple of helper methods that provide
+        Sphinx packet element dimensions
         """
+        assert isinstance(params, SphinxParams)
+
         self.params = params
         if rand_reader is None:
             self.rand_reader = RandReader()

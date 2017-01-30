@@ -19,10 +19,7 @@
 from sphinxmixcrypto.node import UnwrappedMessage
 from sphinxmixcrypto.padding import add_padding
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxDigest, SECURITY_PARAMETER
-
-
-class SphinxNoSURBSAvailableError(Exception):
-    pass
+from sphinxmixcrypto.errors import SphinxNoSURBSAvailableError
 
 
 class NymResult:

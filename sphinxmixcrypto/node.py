@@ -24,43 +24,52 @@ This module includes cryptographic unwrapping of messages for mix net nodes
 
 import binascii
 import zope.interface
+import attr
 
 from sphinxmixcrypto.padding import remove_padding
 from sphinxmixcrypto.common import IPacketReplayCache, IMixPrivateKey
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, GroupCurve25519, SphinxDigest
 from sphinxmixcrypto.crypto_primitives import SphinxStreamCipher, SphinxLioness, xor, CURVE25519_SIZE
+from sphinxmixcrypto.errors import HeaderAlphaGroupMismatchError, ReplayError, IncorrectMACError
+from sphinxmixcrypto.errors import InvalidProcessDestinationError, InvalidMessageTypeError, NoSURBSAvailableError
+from sphinxmixcrypto.errors import KeyMismatchError, SphinxBodySizeMismatchError
 
 
-class HeaderAlphaGroupMismatchError(Exception):
-    pass
+@attr.s(frozen=True)
+class SphinxParams(object):
+
+    max_hops = attr.ib(validator=attr.validators.instance_of(int))
+    payload_size = attr.ib(validator=attr.validators.instance_of(int))
+
+    def get_beta_cipher_size(self):
+        """
+        i am a helper method that is used to compute the size of the
+        stream cipher output used in sphinx packet operations
+        """
+        return CURVE25519_SIZE + (2 * self.max_hops + 1) * SECURITY_PARAMETER
+
+    def get_dimensions(self):
+        """
+        i am a helper method that returns the sphinx packet element sizes, a 4-tuple.
+        e.g. payload = 1024 && 5 hops ==
+        alpha 32 beta 176 gamma 16 delta 1024
+        """
+        alpha = CURVE25519_SIZE
+        beta = (2 * self.max_hops + 1) * SECURITY_PARAMETER
+        gamma = SECURITY_PARAMETER
+        delta = self.payload_size
+        return alpha, beta, gamma, delta
 
 
-class ReplayError(Exception):
-    pass
-
-
-class IncorrectMACError(Exception):
-    pass
-
-
-class InvalidProcessDestinationError(Exception):
-    pass
-
-
-class InvalidMessageTypeError(Exception):
-    pass
-
-
-class NoSURBSAvailableError(Exception):
-    pass
-
-
-class KeyMismatchError(Exception):
-    pass
-
-
-class SphinxBodySizeMismatchError(Exception):
-    pass
+@attr.s(frozen=True)
+class SphinxPacket(object):
+    """
+    I am a decoded sphinx packet
+    """
+    alpha = attr.ib(validator=attr.validators.instance_of(bytes))
+    beta = attr.ib(validator=attr.validators.instance_of(bytes))
+    gamma = attr.ib(validator=attr.validators.instance_of(bytes))
+    delta = attr.ib(validator=attr.validators.instance_of(bytes))
 
 
 DSPEC = b"\x00"  # The special destination
@@ -114,14 +123,6 @@ def generate_node_keypair(rand_reader):
     return public_key, private_key
 
 
-class SphinxPacket:
-    def __init__(self, alpha, beta, gamma, delta):
-        self.alpha = alpha
-        self.beta = beta
-        self.gamma = gamma
-        self.delta = delta
-
-
 class UnwrappedMessage:
     def __init__(self):
         self.tuple_next_hop = ()
@@ -143,28 +144,6 @@ class PacketReplayCacheDict:
 
     def flush(self):
         self.cache = {}
-
-
-class SphinxParams:
-
-    def __init__(self, max_hops, payload_size):
-        self.max_hops = max_hops
-        self.payload_size = payload_size
-        self.beta_cipher_size = CURVE25519_SIZE + (2 * max_hops + 1) * SECURITY_PARAMETER
-
-    def get_dimensions(self):
-        """
-        header overhead = p + (2r + 2)s
-        where p is the asymmetric element,
-        s is the symmetric element and
-        r is the max route length
-        alpha 32 beta 176 gamma 16 delta 1024
-        """
-        alpha = CURVE25519_SIZE
-        beta = (2 * self.max_hops + 1) * SECURITY_PARAMETER
-        gamma = SECURITY_PARAMETER
-        delta = self.payload_size
-        return alpha, beta, gamma, delta
 
 
 def sphinx_packet_unwrap(params, replay_cache, private_key, packet):
@@ -193,7 +172,7 @@ def sphinx_packet_unwrap(params, replay_cache, private_key, packet):
         raise IncorrectMACError()
     replay_cache.set_seen(tag)
     payload = block_cipher.decrypt(block_cipher.create_block_cipher_key(s), packet.delta)
-    B = xor(packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s), params.beta_cipher_size))
+    B = xor(packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s), params.get_beta_cipher_size()))
     message_type, val, rest = prefix_free_decode(B)
 
     if message_type == "mix":

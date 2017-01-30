@@ -2,6 +2,7 @@
 import py.test
 import zope.interface
 import binascii
+import os
 
 from sphinxmixcrypto.crypto_primitives import SphinxLioness
 from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket, generate_node_keypair, generate_node_id_name
@@ -9,7 +10,7 @@ from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, SECURITY_PARAMET
 from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
 from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError, SphinxBodySizeMismatchError
 from sphinxmixcrypto.node import SphinxParams
-from sphinxmixcrypto.client import SphinxClient, rand_subset, create_forward_message, NymKeyNotFoundError, CorruptMessageError
+from sphinxmixcrypto.client import SphinxClient, create_forward_message, NymKeyNotFoundError, CorruptMessageError
 from sphinxmixcrypto.common import RandReader, IMixPKI, IMixPrivateKey
 from sphinxmixcrypto.nym_server import Nymserver, SphinxNoSURBSAvailableError
 from sphinxmixcrypto import _metadata
@@ -17,6 +18,18 @@ from sphinxmixcrypto import _metadata
 
 def use_metadata():
     return _metadata.__version__
+
+
+def rand_subset(lst, nu):
+    """
+    Return a list of nu random elements of the given list (without
+    replacement).
+    """
+    # Randomize the order of the list by sorting on a random key
+    nodeids = [(os.urandom(8), x) for x in lst]
+    nodeids.sort(key=lambda x: x[0])
+    # Return the first nu elements of the randomized list
+    return [x[1] for x in nodeids[:nu]]
 
 
 class FixedNoiseReader():
