@@ -4,8 +4,8 @@ import zope.interface
 import binascii
 import os
 
-from sphinxmixcrypto.crypto_primitives import SphinxLioness
-from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket, generate_node_keypair, generate_node_id_name
+from sphinxmixcrypto.crypto_primitives import SphinxLioness, GroupCurve25519
+from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket
 from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, SECURITY_PARAMETER, create_header, DSPEC
 from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
 from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError, SphinxBodySizeMismatchError
@@ -18,6 +18,28 @@ from sphinxmixcrypto import _metadata
 
 def use_metadata():
     return _metadata.__version__
+
+
+def generate_node_id(id_length, idnum):
+    """
+    generate a new node id
+    """
+    node_id = b"\xff" + idnum + (b"\x00" * (id_length - len(idnum) - 1))
+    return node_id
+
+
+def generate_node_id_name(id_len, rand_reader):
+    idnum = rand_reader.read(4)
+    id = generate_node_id(id_len, idnum)
+    name = "Node " + str(binascii.b2a_hex(idnum))
+    return id, name
+
+
+def generate_node_keypair(rand_reader):
+    group = GroupCurve25519()
+    private_key = group.gensecret(rand_reader)
+    public_key = group.expon(group.generator, private_key)
+    return public_key, private_key
 
 
 def rand_subset(lst, nu):

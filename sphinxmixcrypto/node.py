@@ -101,28 +101,6 @@ def destination_encode(dest):
     return b"%c" % len(dest) + dest
 
 
-def generate_node_id(id_length, idnum):
-    """
-    generate a new node id
-    """
-    node_id = b"\xff" + idnum + (b"\x00" * (id_length - len(idnum) - 1))
-    return node_id
-
-
-def generate_node_id_name(id_len, rand_reader):
-    idnum = rand_reader.read(4)
-    id = generate_node_id(id_len, idnum)
-    name = "Node " + str(binascii.b2a_hex(idnum))
-    return id, name
-
-
-def generate_node_keypair(rand_reader):
-    group = GroupCurve25519()
-    private_key = group.gensecret(rand_reader)
-    public_key = group.expon(group.generator, private_key)
-    return public_key, private_key
-
-
 class UnwrappedMessage:
     def __init__(self):
         self.tuple_next_hop = ()

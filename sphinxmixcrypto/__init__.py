@@ -16,8 +16,8 @@ from sphinxmixcrypto.errors import CorruptMessageError, NymKeyNotFoundError, Inc
 from sphinxmixcrypto.errors import ReplayError, HeaderAlphaGroupMismatchError, InvalidMessageTypeError, SphinxBodySizeMismatchError
 from sphinxmixcrypto.client import SphinxClient, create_forward_message, create_header
 #from sphinxmixcrypto.client import CorruptMessageError, NymKeyNotFoundError
-from sphinxmixcrypto.node import sphinx_packet_unwrap, generate_node_id, generate_node_id_name, prefix_free_decode
-from sphinxmixcrypto.node import generate_node_keypair, SphinxPacket, SECURITY_PARAMETER
+from sphinxmixcrypto.node import sphinx_packet_unwrap, prefix_free_decode
+from sphinxmixcrypto.node import SphinxPacket, SECURITY_PARAMETER
 from sphinxmixcrypto.node import PacketReplayCacheDict
 from sphinxmixcrypto.node import DSPEC, destination_encode, InvalidProcessDestinationError
 from sphinxmixcrypto.node import UnwrappedMessage
@@ -48,14 +48,11 @@ __all__ = [
     "ReaplayError",
     "SECURITY_PARAMETER",
     "prefix_free_decode",
-    "generate_node_keypair",
     "SphinxPacket",
     "sphinx_packet_unwrap",
     "PacketReplayCacheDict",
     "add_padding",
     "remove_padding",
-    "generate_node_id",
-    "generate_node_id_name",
     "Nymserver",
     "SphinxClient",
     "create_forward_message",
