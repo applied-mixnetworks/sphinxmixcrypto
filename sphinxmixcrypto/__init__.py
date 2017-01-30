@@ -14,8 +14,7 @@ from pylioness._metadata import __license__, __copyright__, __url__
 
 from sphinxmixcrypto.errors import CorruptMessageError, NymKeyNotFoundError, IncorrectMACError
 from sphinxmixcrypto.errors import ReplayError, HeaderAlphaGroupMismatchError, InvalidMessageTypeError, SphinxBodySizeMismatchError
-from sphinxmixcrypto.client import SphinxClient, create_forward_message, create_header
-#from sphinxmixcrypto.client import CorruptMessageError, NymKeyNotFoundError
+from sphinxmixcrypto.client import SphinxClient, create_forward_message, create_header, create_surb, ClientMessage
 from sphinxmixcrypto.node import sphinx_packet_unwrap, prefix_free_decode
 from sphinxmixcrypto.node import SphinxPacket, SECURITY_PARAMETER
 from sphinxmixcrypto.node import PacketReplayCacheDict
@@ -28,38 +27,45 @@ from sphinxmixcrypto.padding import add_padding, remove_padding
 from sphinxmixcrypto.common import RandReader, IMixPKI, IPacketReplayCache, IMixPrivateKey
 
 __all__ = [
+    "SECURITY_PARAMETER",
+    "DSPEC",
+
+    "ReplayError",
     "NymKeyNotFoundError",
     "CorruptMessageError",
-    "RandReader",
-    "IMixPKI",
-    "IPacketReplayCache",
-    "IMixPrivateKey",
-    "SphinxParams",
     "SphinxBodySizeMismatchError",
-    "UnwrappedMessage",
     "InvalidMessageTypeError",
     "InvalidProcessDestinationError",
-    "destination_encode",
-    "DSPEC",
-    "create_header",
-    "ReplayError",
     "IncorrectMACError",
     "HeaderAlphaGroupMismatchError",
     "ReaplayError",
-    "SECURITY_PARAMETER",
-    "prefix_free_decode",
+
+    "IMixPKI",
+    "IPacketReplayCache",
+    "IMixPrivateKey",
+
     "SphinxPacket",
-    "sphinx_packet_unwrap",
-    "PacketReplayCacheDict",
-    "add_padding",
-    "remove_padding",
-    "Nymserver",
+    "ClientMessage",
+    "SphinxParams",
     "SphinxClient",
-    "create_forward_message",
+    "UnwrappedMessage",
+    "PacketReplayCacheDict",
+    "Nymserver",
     "GroupCurve25519",
     "SphinxLioness",
     "SphinxStreamCipher",
     "SphinxDigest",
+
+    "sphinx_packet_unwrap",
+    "create_forward_message",
+    "create_surb",
+
+    "create_header",
+    "add_padding",
+    "remove_padding",
+    "destination_encode",
+    "prefix_free_decode",
+    "RandReader",
 
     "__version__", "__author__", "__contact__",
     "__license__", "__copyright__", "__url__",

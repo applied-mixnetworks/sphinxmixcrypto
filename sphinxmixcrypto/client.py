@@ -155,6 +155,7 @@ class SphinxClient:
     def decrypt(self, message_id, delta):
         """
         decrypt reply message
+        returns a ClientMessage
         """
         message = ClientMessage()
         keytuple = self.keytable.pop(message_id, None)
