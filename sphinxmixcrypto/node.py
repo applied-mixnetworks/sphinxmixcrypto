@@ -35,6 +35,9 @@ from sphinxmixcrypto.errors import InvalidProcessDestinationError, InvalidMessag
 from sphinxmixcrypto.errors import KeyMismatchError, SphinxBodySizeMismatchError
 
 
+DSPEC = b"\x00"  # The special destination
+
+
 @attr.s(frozen=True)
 class SphinxParams(object):
 
@@ -73,7 +76,14 @@ class SphinxPacket(object):
     delta = attr.ib(validator=attr.validators.instance_of(bytes))
 
 
-DSPEC = b"\x00"  # The special destination
+@attr.s(frozen=True)
+class UnwrappedMessage(object):
+    """
+    I am the returned result of calling `sphinx_packet_unwrap`.
+    """
+    next_hop = attr.ib(validator=attr.validators.optional(attr.validators.instance_of(tuple)))
+    exit_hop = attr.ib(validator=attr.validators.optional(attr.validators.instance_of(tuple)))
+    client_hop = attr.ib(validator=attr.validators.optional(attr.validators.instance_of(tuple)))
 
 
 # Decode the prefix-free encoding.
@@ -102,15 +112,13 @@ def destination_encode(dest):
     return b"%c" % len(dest) + dest
 
 
-class UnwrappedMessage:
-    def __init__(self):
-        self.tuple_next_hop = ()
-        self.tuple_exit_hop = ()
-        self.tuple_client_hop = ()
-
-
 @zope.interface.implementer(IPacketReplayCache)
 class PacketReplayCacheDict:
+    """
+    I am an implementation of IPacketReplayCache,
+    that uses a dict to implement our replay cache;
+    this helps us detect sphinx packet replays.
+    """
 
     def __init__(self):
         self.cache = {}
@@ -125,6 +133,8 @@ class PacketReplayCacheDict:
         self.cache = {}
 
 
+
+
 def sphinx_packet_unwrap(params, replay_cache, private_key, sphinx_packet):
     """
     sphinx_packet_unwrap returns a UnwrappedMessage given the replay
@@ -137,7 +147,6 @@ def sphinx_packet_unwrap(params, replay_cache, private_key, sphinx_packet):
 
     if len(sphinx_packet.delta) != params.payload_size:
         raise SphinxBodySizeMismatchError()
-    result = UnwrappedMessage()
     group = GroupCurve25519()
     digest = SphinxDigest()
     stream_cipher = SphinxStreamCipher()
@@ -160,7 +169,7 @@ def sphinx_packet_unwrap(params, replay_cache, private_key, sphinx_packet):
         alpha = group.expon(sphinx_packet.alpha, b)
         gamma = B[SECURITY_PARAMETER:SECURITY_PARAMETER * 2]
         beta = B[SECURITY_PARAMETER * 2:]
-        result.tuple_next_hop = (val, (alpha, beta, gamma), payload)
+        result = UnwrappedMessage(next_hop = (val, (alpha, beta, gamma), payload), exit_hop=None, client_hop=None)
         return result
     elif message_type == "process":
         if payload[:SECURITY_PARAMETER] == (b"\x00" * SECURITY_PARAMETER):
@@ -168,11 +177,11 @@ def sphinx_packet_unwrap(params, replay_cache, private_key, sphinx_packet):
             if inner_type == "client":
                 # We're to deliver rest (unpadded) to val
                 body = remove_padding(rest)
-                result.tuple_exit_hop = (val, body)
+                result = UnwrappedMessage(exit_hop = (val, body), next_hop=None, client_hop=None)
                 return result
         raise InvalidProcessDestinationError()
     elif message_type == "client":
         id = rest[:SECURITY_PARAMETER]
-        result.tuple_client_hop = (val, id, payload)
+        result = UnwrappedMessage(client_hop = (val, id, payload), exit_hop=None, next_hop=None)
         return result
     raise InvalidMessageTypeError()

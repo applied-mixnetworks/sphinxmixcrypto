@@ -141,10 +141,9 @@ class TestSphinxCorrectness():
         replay_cache = PacketReplayCacheDict()
         key_state = SphinxNodeKeyState(self.private_key_map[route[0]])
         result = sphinx_packet_unwrap(params, replay_cache, key_state, packet)
-        assert len(result.tuple_exit_hop) == 2
-        assert len(result.tuple_next_hop) == 0
-        assert len(result.tuple_client_hop) == 0
-        received_dest, received_message = result.tuple_exit_hop
+        received_dest, received_message = result.exit_hop
+        assert result.client_hop is None
+        assert result.next_hop is None
         assert received_dest == destination
         assert received_message == message
 
@@ -289,32 +288,31 @@ class TestSphinxEnd2End():
         self.match_hop = "ff81855a360000000000000000000000"
         params = SphinxParams(5, 1024)
         result = self.mixnet_test_state_machine(params, nym_result.message_result)
-        received_client_message = result.tuple_message[1]
-        assert message == received_client_message
+        assert message == result.payload
 
     def mixnet_test_state_machine(self, params, result):
         i = 0
         while True:
-            if result.tuple_next_hop:
-                if result.tuple_next_hop[0] == binascii.unhexlify(self.match_hop):
-                    # print "alpha %s" % binascii.hexlify(result.tuple_next_hop[1][0])
-                    # print "beta %s" % binascii.hexlify(result.tuple_next_hop[1][1])
-                    # print "gamma %s" % binascii.hexlify(result.tuple_next_hop[1][2])
-                    # print "delta %s" % binascii.hexlify(result.tuple_next_hop[2])
-                    assert result.tuple_next_hop[1][0] == self.alpha
-                    assert result.tuple_next_hop[1][1] == self.beta
-                    assert result.tuple_next_hop[1][2] == self.gamma
-                    assert result.tuple_next_hop[2] == self.delta
+            if result.next_hop:
+                if result.next_hop[0] == binascii.unhexlify(self.match_hop):
+                    # print "alpha %s" % binascii.hexlify(result.next_hop[1][0])
+                    # print "beta %s" % binascii.hexlify(result.next_hop[1][1])
+                    # print "gamma %s" % binascii.hexlify(result.next_hop[1][2])
+                    # print "delta %s" % binascii.hexlify(result.next_hop[2])
+                    assert result.next_hop[1][0] == self.alpha
+                    assert result.next_hop[1][1] == self.beta
+                    assert result.next_hop[1][2] == self.gamma
+                    assert result.next_hop[2] == self.delta
 
-                packet = SphinxPacket(result.tuple_next_hop[1][0], result.tuple_next_hop[1][1], result.tuple_next_hop[1][2], result.tuple_next_hop[2])
-                result = self.send_to_mix(params, result.tuple_next_hop[0], packet)
+                packet = SphinxPacket(result.next_hop[1][0], result.next_hop[1][1], result.next_hop[1][2], result.next_hop[2])
+                result = self.send_to_mix(params, result.next_hop[0], packet)
                 i += 1
-            elif result.tuple_exit_hop:
-                # print("Deliver [%s] to [%s]" % (result.tuple_exit_hop[1], binascii.hexlify(result.tuple_exit_hop[0])))
-                return result.tuple_exit_hop[1]
-            elif result.tuple_client_hop:
-                result = self.send_to_client(*result.tuple_client_hop)
-                # print("message received by [%s]" % result.tuple_message[0])
+            elif result.exit_hop:
+                # print("Deliver [%s] to [%s]" % (result.exit_hop[1], binascii.hexlify(result.exit_hop[0])))
+                return result.exit_hop[1]
+            elif result.client_hop:
+                result = self.send_to_client(*result.client_hop)
+                # print("message received by [%s]" % result.message[0])
                 return result
 
     def send_to_client(self, client_id, message_id, delta):
@@ -346,14 +344,14 @@ class TestSphinxEnd2End():
     def mixnet_test_corrupted_packet_state_machine(self, params, result):
         i = 0
         while True:
-            if result.tuple_next_hop:
-                packet = SphinxPacket(result.tuple_next_hop[1][0], result.tuple_next_hop[1][1], result.tuple_next_hop[1][2], result.tuple_next_hop[2])
-                result = self.send_to_mix(params, result.tuple_next_hop[0], packet)
+            if result.next_hop:
+                packet = SphinxPacket(result.next_hop[1][0], result.next_hop[1][1], result.next_hop[1][2], result.next_hop[2])
+                result = self.send_to_mix(params, result.next_hop[0], packet)
                 i += 1
-            elif result.tuple_exit_hop:
-                return result.tuple_exit_hop[1]
-            elif result.tuple_client_hop:
-                result = self.send_to_client(*result.tuple_client_hop)
+            elif result.exit_hop:
+                return result.exit_hop[1]
+            elif result.client_hop:
+                result = self.send_to_client(*result.client_hop)
                 return result
 
     def test_sphinx_corrupted_process_message(self):

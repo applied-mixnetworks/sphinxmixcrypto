@@ -17,6 +17,7 @@
 # <http://www.gnu.org/licenses/>.
 
 import binascii
+import attr
 
 from sphinxmixcrypto.node import destination_encode, DSPEC, SphinxParams
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, xor
@@ -99,6 +100,9 @@ def create_forward_message(params, route, pki, dest, msg, rand_reader):
 
 
 def create_surb(params, route, pki, dest, rand_reader):
+    """
+    returns -> 16 byte message ID, key tuple, nym tuple w/ header
+    """
     assert IMixPKI.providedBy(pki)
 
     message_id = rand_reader.read(SECURITY_PARAMETER)
@@ -116,9 +120,10 @@ def create_surb(params, route, pki, dest, rand_reader):
     return message_id, keytuple, (route[0], header, ktilde)
 
 
-class ClientMessage:
-    def __init__(self):
-        self.payload = None
+@attr.s(frozen=True)
+class ClientMessage(object):
+    identity = attr.ib(validator=attr.validators.instance_of(bytes))
+    payload = attr.ib(validator=attr.validators.instance_of(bytes))
 
 
 class SphinxClient:
@@ -157,7 +162,6 @@ class SphinxClient:
         decrypt reply message
         returns a ClientMessage
         """
-        message = ClientMessage()
         keytuple = self.keytable.pop(message_id, None)
         block_cipher = SphinxLioness()
         if keytuple is None:
@@ -172,7 +176,6 @@ class SphinxClient:
 
         if delta[:SECURITY_PARAMETER] == (b"\x00" * SECURITY_PARAMETER):
             msg = remove_padding(delta[SECURITY_PARAMETER:])
-            message.tuple_message = (self.id, msg)
-            return message
+            return ClientMessage(identity=self.id, payload=msg)
 
         raise CorruptMessageError
