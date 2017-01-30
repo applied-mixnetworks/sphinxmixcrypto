@@ -55,7 +55,7 @@ def create_header(params, route, pki, dest, message_id, rand_reader):
     for i in range(1, route_len):
         min = (2 * (params.max_hops - i) + 3) * SECURITY_PARAMETER
         phi = xor(phi + (b"\x00" * (2 * SECURITY_PARAMETER)),
-                  stream_cipher.generate_stream(digest.create_stream_cipher_key(asbtuples[i - 1]['s']), params.get_beta_cipher_size())[min:])
+                  stream_cipher.generate_stream(digest.create_stream_cipher_key(asbtuples[i - 1]['s']), params.beta_cipher_size)[min:])
 
     # Compute the (beta, gamma) tuples
     beta = dest + message_id + padding
@@ -69,7 +69,7 @@ def create_header(params, route, pki, dest, message_id, rand_reader):
         assert len(message_id) == SECURITY_PARAMETER
         stream_key = digest.create_stream_cipher_key(asbtuples[i]['s'])
         beta = xor(message_id + gamma + beta[:(2 * params.max_hops - 1) * SECURITY_PARAMETER],
-                   stream_cipher.generate_stream(stream_key, params.get_beta_cipher_size())[:(2 * params.max_hops + 1) * SECURITY_PARAMETER])
+                   stream_cipher.generate_stream(stream_key, params.beta_cipher_size)[:(2 * params.max_hops + 1) * SECURITY_PARAMETER])
         gamma = digest.hmac(digest.create_hmac_key(asbtuples[i]['s']), beta)
     return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
 

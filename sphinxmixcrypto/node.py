@@ -41,7 +41,8 @@ class SphinxParams(object):
     max_hops = attr.ib(validator=attr.validators.instance_of(int))
     payload_size = attr.ib(validator=attr.validators.instance_of(int))
 
-    def get_beta_cipher_size(self):
+    @property
+    def beta_cipher_size(self):
         """
         i am a helper method that is used to compute the size of the
         stream cipher output used in sphinx packet operations
@@ -151,7 +152,7 @@ def sphinx_packet_unwrap(params, replay_cache, private_key, sphinx_packet):
         raise IncorrectMACError()
     replay_cache.set_seen(tag)
     payload = block_cipher.decrypt(block_cipher.create_block_cipher_key(s), sphinx_packet.delta)
-    B = xor(sphinx_packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s), params.get_beta_cipher_size()))
+    B = xor(sphinx_packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s), params.beta_cipher_size))
     message_type, val, rest = prefix_free_decode(B)
 
     if message_type == "mix":
