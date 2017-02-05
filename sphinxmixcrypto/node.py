@@ -22,12 +22,11 @@
 This module includes cryptographic unwrapping of messages for mix net nodes
 """
 
-import binascii
 import zope.interface
 import attr
 
 from sphinxmixcrypto.padding import remove_padding
-from sphinxmixcrypto.common import IPacketReplayCache, IMixPrivateKey
+from sphinxmixcrypto.common import IPacketReplayCache, IKeyState
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, GroupCurve25519, SphinxDigest
 from sphinxmixcrypto.crypto_primitives import SphinxStreamCipher, SphinxLioness, xor, CURVE25519_SIZE
 from sphinxmixcrypto.errors import HeaderAlphaGroupMismatchError, ReplayError, IncorrectMACError
@@ -135,14 +134,14 @@ class PacketReplayCacheDict:
 
 
 
-def sphinx_packet_unwrap(params, replay_cache, private_key, sphinx_packet):
+def sphinx_packet_unwrap(params, replay_cache, key_state, sphinx_packet):
     """
     sphinx_packet_unwrap returns a UnwrappedMessage given the replay
     cache, private key and a packet or raises an exception if an error
     was encountered
     """
     assert IPacketReplayCache.providedBy(replay_cache)
-    assert IMixPrivateKey.providedBy(private_key)
+    assert IKeyState.providedBy(key_state)
     assert isinstance(sphinx_packet, SphinxPacket)
 
     if len(sphinx_packet.delta) != params.payload_size:
@@ -153,7 +152,7 @@ def sphinx_packet_unwrap(params, replay_cache, private_key, sphinx_packet):
     block_cipher = SphinxLioness()
     if not group.in_group(sphinx_packet.alpha):
         raise HeaderAlphaGroupMismatchError()
-    s = group.expon(sphinx_packet.alpha, private_key.get_private_key())
+    s = group.expon(sphinx_packet.alpha, key_state.get_private_key())
     tag = digest.hash_replay(s)
     if replay_cache.has_seen(tag):
         raise ReplayError()

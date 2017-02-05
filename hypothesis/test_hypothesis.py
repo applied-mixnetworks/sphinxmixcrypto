@@ -7,11 +7,11 @@ from hypothesis.strategies import binary
 import zope
 import zope.interface
 
-from sphinxmixcrypto import IMixPrivateKey, SphinxPacket, sphinx_packet_unwrap, PacketReplayCacheDict, SphinxParams
+from sphinxmixcrypto import IKeyState, SphinxPacket, sphinx_packet_unwrap, PacketReplayCacheDict, SphinxParams
 from sphinxmixcrypto import SphinxBodySizeMismatchError, GroupCurve25519, IncorrectMACError
 
 
-@zope.interface.implementer(IMixPrivateKey)
+@zope.interface.implementer(IKeyState)
 @attr.s
 class SphinxNodeKeyState(object):
 
@@ -20,6 +20,8 @@ class SphinxNodeKeyState(object):
     def get_private_key(self):
         return self.private_key
 
+    def get_public_key(self):
+        pass
 
 @given(
     binary(),

@@ -78,7 +78,12 @@ class IPacketReplayCache(zope.interface.Interface):
         """
 
 
-class IMixPrivateKey(zope.interface.Interface):
+class IKeyState(zope.interface.Interface):
+
+    def get_public_key(self):
+        """
+        return the public key, a 32 byte value
+        """
 
     def get_private_key(self):
         """

@@ -11,7 +11,7 @@ from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, de
 from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError, SphinxBodySizeMismatchError
 from sphinxmixcrypto.node import SphinxParams
 from sphinxmixcrypto.client import SphinxClient, create_forward_message, NymKeyNotFoundError, CorruptMessageError
-from sphinxmixcrypto.common import RandReader, IMixPKI, IMixPrivateKey
+from sphinxmixcrypto.common import RandReader, IMixPKI, IKeyState
 from sphinxmixcrypto.nym_server import Nymserver, SphinxNoSURBSAvailableError
 from sphinxmixcrypto import _metadata
 
@@ -71,7 +71,7 @@ class FixedNoiseReader():
         return ret
 
 
-@zope.interface.implementer(IMixPrivateKey)
+@zope.interface.implementer(IKeyState)
 class SphinxNodeKeyState:
 
     def __init__(self, private_key):
@@ -79,6 +79,9 @@ class SphinxNodeKeyState:
 
     def get_private_key(self):
         return self.private_key
+
+    def get_public_key(self):
+        pass
 
 
 @zope.interface.implementer(IMixPKI)

@@ -24,7 +24,7 @@ from sphinxmixcrypto.node import SphinxParams
 from sphinxmixcrypto.crypto_primitives import GroupCurve25519, SphinxLioness, SphinxStreamCipher, SphinxDigest
 from sphinxmixcrypto.nym_server import Nymserver
 from sphinxmixcrypto.padding import add_padding, remove_padding
-from sphinxmixcrypto.common import RandReader, IMixPKI, IPacketReplayCache, IMixPrivateKey
+from sphinxmixcrypto.common import RandReader, IMixPKI, IPacketReplayCache, IKeyState
 
 __all__ = [
     "SECURITY_PARAMETER",
@@ -42,7 +42,7 @@ __all__ = [
 
     "IMixPKI",
     "IPacketReplayCache",
-    "IMixPrivateKey",
+    "IKeyState",
 
     "SphinxPacket",
     "ClientMessage",
