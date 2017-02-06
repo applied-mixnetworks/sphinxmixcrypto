@@ -1,6 +1,51 @@
 
 
 from sphinxmixcrypto import prefix_free_decode, SECURITY_PARAMETER
+from sphinxmixcrypto import SphinxParams, sphinx_packet_encode, sphinx_packet_decode
+
+
+def test_sphinx_packet_encode_decode():
+    params = SphinxParams(5, 1024)
+    alpha = b"A" * 32
+    beta = b"B" * 176
+    gamma = b"G" * 16
+    delta = b"D" * 1024
+    packet = sphinx_packet_encode(params, alpha, beta, gamma, delta)
+    assert len(packet) == 1248
+
+    decoded_packet = sphinx_packet_decode(params, packet)
+    assert len(decoded_packet.alpha) == 32
+    assert len(decoded_packet.beta) == 176
+    assert len(decoded_packet.gamma) == 16
+    assert len(decoded_packet.delta) == 1024
+
+    params = SphinxParams(10, 1024)
+    alpha = b"A" * 32
+    beta = b"B" * 336
+    gamma = b"G" * 16
+    delta = b"D" * 1024
+    packet = sphinx_packet_encode(params, alpha, beta, gamma, delta)
+    assert len(packet) == 1408
+
+    decoded_packet = sphinx_packet_decode(params, packet)
+    assert len(decoded_packet.alpha) == 32
+    assert len(decoded_packet.beta) == 336
+    assert len(decoded_packet.gamma) == 16
+    assert len(decoded_packet.delta) == 1024
+
+    params = SphinxParams(10, 2048)
+    alpha = b"A" * 32
+    beta = b"B" * 336
+    gamma = b"G" * 16
+    delta = b"D" * 2048
+    packet = sphinx_packet_encode(params, alpha, beta, gamma, delta)
+    assert len(packet) == 2432
+
+    decoded_packet = sphinx_packet_decode(params, packet)
+    assert len(decoded_packet.alpha) == 32
+    assert len(decoded_packet.beta) == 336
+    assert len(decoded_packet.gamma) == 16
+    assert len(decoded_packet.delta) == 2048
 
 
 def test_prefix_free_decode():
