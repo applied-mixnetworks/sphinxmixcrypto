@@ -34,8 +34,6 @@ from sphinxmixcrypto.errors import InvalidProcessDestinationError, InvalidMessag
 from sphinxmixcrypto.errors import SphinxBodySizeMismatchError
 
 
-DSPEC = b"\x00"  # The special destination
-
 
 def sphinx_packet_decode(params, packet):
     alpha, beta, gamma, delta = params.get_dimensions()
@@ -120,14 +118,6 @@ def prefix_free_decode(s):
     if l < 128:
         return 'client', s[1:l + 1], s[l + 1:]
     return None, None, None
-
-
-def destination_encode(dest):
-    """
-    encode destination
-    """
-    assert len(dest) >= 1 and len(dest) <= 127
-    return b"%c" % len(dest) + dest
 
 
 @zope.interface.implementer(IPacketReplayCache)

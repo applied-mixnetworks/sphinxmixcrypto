@@ -18,12 +18,20 @@
 
 import attr
 
-from sphinxmixcrypto.node import destination_encode, DSPEC, SphinxParams
+from sphinxmixcrypto.node import SphinxParams
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, xor
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxStreamCipher, SphinxDigest, GroupCurve25519
 from sphinxmixcrypto.padding import add_padding, remove_padding
 from sphinxmixcrypto.interfaces import IReader, IMixPKI
 from sphinxmixcrypto.errors import NymKeyNotFoundError, CorruptMessageError
+
+
+def destination_encode(dest):
+    """
+    encode destination
+    """
+    assert len(dest) >= 1 and len(dest) <= 127
+    return b"%c" % len(dest) + dest
 
 
 def create_header(params, route, pki, dest, message_id, rand_reader):
@@ -83,7 +91,7 @@ def create_forward_message(params, route, pki, dest, msg, rand_reader):
     block_cipher = SphinxLioness()
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, pki, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
+    header, secrets = create_header(params, route, pki, b"\x00", b"\x00" * SECURITY_PARAMETER, rand_reader)
     encoded_dest = destination_encode(dest)
     body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
     padded_body = add_padding(body, params.payload_size)
@@ -129,7 +137,7 @@ class ClientMessage(object):
 class SphinxClient(object):
 
     params = attr.ib(validator=attr.validators.instance_of(SphinxParams))
-    client_id = attr.ib(validator=attr.validators.instance_of(str))
+    client_id = attr.ib(validator=attr.validators.instance_of(bytes))
     rand_reader = attr.ib(validator=attr.validators.provides(IReader))
     _keytable = attr.ib(init=False, default={})
 

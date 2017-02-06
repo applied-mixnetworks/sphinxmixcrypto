@@ -6,7 +6,7 @@ import os
 
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, GroupCurve25519
 from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket
-from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, SECURITY_PARAMETER, create_header, DSPEC
+from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, SECURITY_PARAMETER, create_header
 from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
 from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError, SphinxBodySizeMismatchError
 from sphinxmixcrypto import SphinxParams, SphinxClient, create_forward_message, NymKeyNotFoundError, CorruptMessageError
@@ -266,7 +266,7 @@ class TestSphinxEnd2End():
     def test_sphinx_replay(self):
         rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
 
-        self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
+        self.setUpMixVectors(rand_reader, client_id=b"client")
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
         alpha, beta, gamma, delta = create_forward_message(params, self.route, self.pki,
@@ -328,6 +328,7 @@ class TestSphinxEnd2End():
 
     def test_end_to_end(self):
         rand_reader = FixedNoiseReader("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b43c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
+        #  XXX should we make client_ids be strings or what?
         self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
@@ -360,7 +361,7 @@ class TestSphinxEnd2End():
 
     def test_sphinx_corrupted_process_message(self):
         rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
-        self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
+        self.setUpMixVectors(rand_reader, client_id=b"client")
         destination = b"dest"
         message = b"this is a test"
         rand_reader = RandReader()
@@ -374,7 +375,7 @@ class TestSphinxEnd2End():
 
     def test_sphinx_invalid_message(self):
         rand_reader = FixedNoiseReader("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b43c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
-        self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
+        self.setUpMixVectors(rand_reader, client_id=b"client")
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
         alpha, beta, gamma, delta = create_invalid_message(params, self.route, self.pki,
@@ -392,7 +393,7 @@ def create_corrupt_process_message(params, route, node_map, dest, msg, rand_read
     assert SECURITY_PARAMETER + 1 + len(dest) + len(msg) < params.payload_size
     block_cipher = SphinxLioness()
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, node_map, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
+    header, secrets = create_header(params, route, node_map, b"\x00", b"\x00" * SECURITY_PARAMETER, rand_reader)
     encoded_dest = destination_encode(dest)
     body = (b"\xFF" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
     padded_body = add_padding(body, params.payload_size)
@@ -429,7 +430,7 @@ def test_client_invalid_key():
     params = SphinxParams(5, 1024)
     message_id = "fake message id"
     rand_reader = FixedNoiseReader("FA")
-    client = SphinxClient(params, "client id", rand_reader=rand_reader)
+    client = SphinxClient(params, b"client id", rand_reader=rand_reader)
     py.test.raises(NymKeyNotFoundError, client.decrypt, message_id, "fake delta")
 
 
