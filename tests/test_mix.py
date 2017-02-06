@@ -7,7 +7,7 @@ import os
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, GroupCurve25519
 from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket
 from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, SECURITY_PARAMETER, create_header, DSPEC
-from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
+from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode, sphinx_packet_decode
 from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError, SphinxBodySizeMismatchError
 from sphinxmixcrypto.node import SphinxParams
 from sphinxmixcrypto.client import SphinxClient, create_forward_message, NymKeyNotFoundError, CorruptMessageError
@@ -298,18 +298,15 @@ class TestSphinxEnd2End():
         while True:
             if result.next_hop:
                 if result.next_hop[0] == binascii.unhexlify(self.match_hop):
-                    # print "alpha %s" % binascii.hexlify(result.next_hop[1][0])
-                    # print "beta %s" % binascii.hexlify(result.next_hop[1][1])
-                    # print "gamma %s" % binascii.hexlify(result.next_hop[1][2])
-                    # print "delta %s" % binascii.hexlify(result.next_hop[2])
-                    assert result.next_hop[1][0] == self.alpha
-                    assert result.next_hop[1][1] == self.beta
-                    assert result.next_hop[1][2] == self.gamma
-                    assert result.next_hop[2] == self.delta
-
-                packet = SphinxPacket(result.next_hop[1][0], result.next_hop[1][1], result.next_hop[1][2], result.next_hop[2])
-                result = self.send_to_mix(params, result.next_hop[0], packet)
-                i += 1
+                    assert result.next_hop[1].alpha == self.alpha
+                    assert result.next_hop[1].beta == self.beta
+                    assert result.next_hop[1].gamma == self.gamma
+                    assert result.next_hop[1].delta == self.delta
+                if result.next_hop[1]:
+                    sphinx_packet = result.next_hop[1]
+                    assert isinstance(sphinx_packet, SphinxPacket)
+                    result = self.send_to_mix(params, result.next_hop[0], sphinx_packet)
+                    i += 1
             elif result.exit_hop:
                 # print("Deliver [%s] to [%s]" % (result.exit_hop[1], binascii.hexlify(result.exit_hop[0])))
                 return result.exit_hop[1]
@@ -348,7 +345,7 @@ class TestSphinxEnd2End():
         i = 0
         while True:
             if result.next_hop:
-                packet = SphinxPacket(result.next_hop[1][0], result.next_hop[1][1], result.next_hop[1][2], result.next_hop[2])
+                packet = result.next_hop[1]
                 result = self.send_to_mix(params, result.next_hop[0], packet)
                 i += 1
             elif result.exit_hop:

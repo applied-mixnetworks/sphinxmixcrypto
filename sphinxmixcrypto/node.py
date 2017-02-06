@@ -30,11 +30,30 @@ from sphinxmixcrypto.common import IPacketReplayCache, IKeyState
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, GroupCurve25519, SphinxDigest
 from sphinxmixcrypto.crypto_primitives import SphinxStreamCipher, SphinxLioness, xor, CURVE25519_SIZE
 from sphinxmixcrypto.errors import HeaderAlphaGroupMismatchError, ReplayError, IncorrectMACError
-from sphinxmixcrypto.errors import InvalidProcessDestinationError, InvalidMessageTypeError, NoSURBSAvailableError
-from sphinxmixcrypto.errors import KeyMismatchError, SphinxBodySizeMismatchError
+from sphinxmixcrypto.errors import InvalidProcessDestinationError, InvalidMessageTypeError
+from sphinxmixcrypto.errors import SphinxBodySizeMismatchError
 
 
 DSPEC = b"\x00"  # The special destination
+
+
+def sphinx_packet_decode(params, packet):
+    alpha, beta, gamma, delta = params.get_dimensions()
+    _alpha = packet[:alpha]
+    _beta = packet[alpha:alpha + beta]
+    _gamma = packet[alpha + beta:alpha + beta + gamma]
+    _delta = packet[alpha + beta + gamma:]
+    sphinx_packet = SphinxPacket(_alpha, _beta, _gamma, _delta)
+    return sphinx_packet
+
+
+def sphinx_packet_encode(params, alpha, beta, gamma, delta):
+    alpha_len, beta_len, gamma_len, delta_len = params.get_dimensions()
+    assert alpha_len == len(alpha)
+    assert beta_len == len(beta)
+    assert gamma_len == len(gamma)
+    assert delta_len == len(delta)
+    return alpha + beta + gamma + delta
 
 
 @attr.s(frozen=True)
@@ -168,7 +187,8 @@ def sphinx_packet_unwrap(params, replay_cache, key_state, sphinx_packet):
         alpha = group.expon(sphinx_packet.alpha, b)
         gamma = B[SECURITY_PARAMETER:SECURITY_PARAMETER * 2]
         beta = B[SECURITY_PARAMETER * 2:]
-        result = UnwrappedMessage(next_hop = (val, (alpha, beta, gamma), payload), exit_hop=None, client_hop=None)
+        unwrapped_sphinx_packet = SphinxPacket(alpha=alpha, beta=beta, gamma=gamma, delta=payload)
+        result = UnwrappedMessage(next_hop = (val, unwrapped_sphinx_packet), exit_hop=None, client_hop=None)
         return result
     elif message_type == "process":
         if payload[:SECURITY_PARAMETER] == (b"\x00" * SECURITY_PARAMETER):
