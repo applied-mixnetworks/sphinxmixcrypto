@@ -12,19 +12,20 @@ from __future__ import with_statement
 from pylioness._metadata import __version__, __author__, __contact__
 from pylioness._metadata import __license__, __copyright__, __url__
 
-from sphinxmixcrypto.errors import CorruptMessageError, NymKeyNotFoundError, IncorrectMACError
+from sphinxmixcrypto.errors import CorruptMessageError, NymKeyNotFoundError, IncorrectMACError, SphinxNoSURBSAvailableError
 from sphinxmixcrypto.errors import ReplayError, HeaderAlphaGroupMismatchError, InvalidMessageTypeError, SphinxBodySizeMismatchError
-from sphinxmixcrypto.client import SphinxClient, create_forward_message, create_header, create_surb, ClientMessage
+from sphinxmixcrypto.client import SphinxClient, create_forward_message, create_header
+from sphinxmixcrypto.client import create_surb, ClientMessage, destination_encode
 from sphinxmixcrypto.node import sphinx_packet_unwrap, prefix_free_decode
 from sphinxmixcrypto.node import SphinxPacket, SECURITY_PARAMETER
 from sphinxmixcrypto.node import PacketReplayCacheDict
-from sphinxmixcrypto.node import DSPEC, destination_encode, InvalidProcessDestinationError
+from sphinxmixcrypto.node import InvalidProcessDestinationError
 from sphinxmixcrypto.node import UnwrappedMessage
-from sphinxmixcrypto.node import SphinxParams, sphinx_packet_decode
+from sphinxmixcrypto.node import SphinxParams, sphinx_packet_decode, sphinx_packet_encode
 from sphinxmixcrypto.crypto_primitives import GroupCurve25519, SphinxLioness, SphinxStreamCipher, SphinxDigest
 from sphinxmixcrypto.nym_server import Nymserver
 from sphinxmixcrypto.padding import add_padding, remove_padding
-from sphinxmixcrypto.common import RandReader, IMixPKI, IPacketReplayCache, IKeyState
+from sphinxmixcrypto.interfaces import IReader, IMixPKI, IPacketReplayCache, IKeyState
 
 __all__ = [
     "SECURITY_PARAMETER",
@@ -43,6 +44,7 @@ __all__ = [
     "IMixPKI",
     "IPacketReplayCache",
     "IKeyState",
+    "IReader",
 
     "SphinxPacket",
     "ClientMessage",
@@ -57,6 +59,7 @@ __all__ = [
     "SphinxDigest",
 
     "sphinx_packet_decode",
+    "sphinx_packet_encode",
     "sphinx_packet_unwrap",
     "create_forward_message",
     "create_surb",

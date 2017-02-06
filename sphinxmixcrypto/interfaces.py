@@ -79,6 +79,9 @@ class IPacketReplayCache(zope.interface.Interface):
 
 
 class IKeyState(zope.interface.Interface):
+    """
+    key state interface providers getters from public and private keys
+    """
 
     def get_public_key(self):
         """
@@ -91,9 +94,13 @@ class IKeyState(zope.interface.Interface):
         """
 
 
-class RandReader:
-    def __init__(self):
-        pass
+class IReader(zope.interface.Interface):
+    """
+    i'm an interface used for bytes for generating key material.
+    this assists our writing of deterministic unit tests.
+    """
 
     def read(self, n):
-        return os.urandom(n)
+        """
+        return n bytes
+        """

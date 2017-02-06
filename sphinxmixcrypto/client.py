@@ -16,15 +16,22 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-import binascii
 import attr
 
-from sphinxmixcrypto.node import destination_encode, DSPEC, SphinxParams
+from sphinxmixcrypto.node import SphinxParams
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, xor
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxStreamCipher, SphinxDigest, GroupCurve25519
 from sphinxmixcrypto.padding import add_padding, remove_padding
-from sphinxmixcrypto.common import RandReader, IMixPKI
+from sphinxmixcrypto.interfaces import IReader, IMixPKI
 from sphinxmixcrypto.errors import NymKeyNotFoundError, CorruptMessageError
+
+
+def destination_encode(dest):
+    """
+    encode destination
+    """
+    assert len(dest) >= 1 and len(dest) <= 127
+    return b"%c" % len(dest) + dest
 
 
 def create_header(params, route, pki, dest, message_id, rand_reader):
@@ -84,7 +91,7 @@ def create_forward_message(params, route, pki, dest, msg, rand_reader):
     block_cipher = SphinxLioness()
 
     # Compute the header and the secrets
-    header, secrets = create_header(params, route, pki, DSPEC, b"\x00" * SECURITY_PARAMETER, rand_reader)
+    header, secrets = create_header(params, route, pki, b"\x00", b"\x00" * SECURITY_PARAMETER, rand_reader)
     encoded_dest = destination_encode(dest)
     body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
     padded_body = add_padding(body, params.payload_size)
@@ -126,25 +133,13 @@ class ClientMessage(object):
     payload = attr.ib(validator=attr.validators.instance_of(bytes))
 
 
-class SphinxClient:
-    def __init__(self, params, id, rand_reader=None):
-        """
-        params is an instance of SphinxParams, encapsulating max hops
-        and payload size and a couple of helper methods that provide
-        Sphinx packet element dimensions
-        """
-        assert isinstance(params, SphinxParams)
+@attr.s
+class SphinxClient(object):
 
-        self.params = params
-        if rand_reader is None:
-            self.rand_reader = RandReader()
-        else:
-            self.rand_reader = rand_reader
-        if id is None:
-            self.id = b"Client %s" % binascii.hexlify(self.rand_reader.read(4))
-        else:
-            self.id = id
-        self.keytable = {}
+    params = attr.ib(validator=attr.validators.instance_of(SphinxParams))
+    client_id = attr.ib(validator=attr.validators.instance_of(bytes))
+    rand_reader = attr.ib(validator=attr.validators.provides(IReader))
+    _keytable = attr.ib(init=False, default={})
 
     def create_nym(self, route, pki):
         """
@@ -153,8 +148,8 @@ class SphinxClient:
         """
         assert IMixPKI.providedBy(pki)
 
-        message_id, keytuple, nymtuple = create_surb(self.params, route, pki, self.id, self.rand_reader)
-        self.keytable[message_id] = keytuple
+        message_id, keytuple, nymtuple = create_surb(self.params, route, pki, self.client_id, self.rand_reader)
+        self._keytable[message_id] = keytuple
         return nymtuple
 
     def decrypt(self, message_id, delta):
@@ -162,7 +157,7 @@ class SphinxClient:
         decrypt reply message
         returns a ClientMessage
         """
-        keytuple = self.keytable.pop(message_id, None)
+        keytuple = self._keytable.pop(message_id, None)
         block_cipher = SphinxLioness()
         if keytuple is None:
             raise NymKeyNotFoundError
@@ -176,6 +171,6 @@ class SphinxClient:
 
         if delta[:SECURITY_PARAMETER] == (b"\x00" * SECURITY_PARAMETER):
             msg = remove_padding(delta[SECURITY_PARAMETER:])
-            return ClientMessage(identity=self.id, payload=msg)
+            return ClientMessage(identity=self.client_id, payload=msg)
 
         raise CorruptMessageError
