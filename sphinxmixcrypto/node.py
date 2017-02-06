@@ -26,7 +26,7 @@ import zope.interface
 import attr
 
 from sphinxmixcrypto.padding import remove_padding
-from sphinxmixcrypto.common import IPacketReplayCache, IKeyState
+from sphinxmixcrypto.interfaces import IPacketReplayCache, IKeyState
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, GroupCurve25519, SphinxDigest
 from sphinxmixcrypto.crypto_primitives import SphinxStreamCipher, SphinxLioness, xor, CURVE25519_SIZE
 from sphinxmixcrypto.errors import HeaderAlphaGroupMismatchError, ReplayError, IncorrectMACError
@@ -149,8 +149,6 @@ class PacketReplayCacheDict:
 
     def flush(self):
         self.cache = {}
-
-
 
 
 def sphinx_packet_unwrap(params, replay_cache, key_state, sphinx_packet):

@@ -7,17 +7,24 @@ import os
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, GroupCurve25519
 from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket
 from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, SECURITY_PARAMETER, create_header, DSPEC
-from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode, sphinx_packet_decode
+from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
 from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError, SphinxBodySizeMismatchError
-from sphinxmixcrypto.node import SphinxParams
-from sphinxmixcrypto.client import SphinxClient, create_forward_message, NymKeyNotFoundError, CorruptMessageError
-from sphinxmixcrypto.common import RandReader, IMixPKI, IKeyState
-from sphinxmixcrypto.nym_server import Nymserver, SphinxNoSURBSAvailableError
+from sphinxmixcrypto import SphinxParams, SphinxClient, create_forward_message, NymKeyNotFoundError, CorruptMessageError
+from sphinxmixcrypto import IReader, IMixPKI, IKeyState, Nymserver, SphinxNoSURBSAvailableError
 from sphinxmixcrypto import _metadata
 
 
 def use_metadata():
     return _metadata.__version__
+
+
+@zope.interface.implementer(IReader)
+class RandReader:
+    def __init__(self):
+        pass
+
+    def read(self, n):
+        return os.urandom(n)
 
 
 def generate_node_id(id_length, idnum):
@@ -54,6 +61,7 @@ def rand_subset(lst, nu):
     return [x[1] for x in nodeids[:nu]]
 
 
+@zope.interface.implementer(IReader)
 class FixedNoiseReader():
 
     def __init__(self, hexed_noise):
@@ -91,21 +99,21 @@ class DummyPKI(object):
         self.node_map = {}
         self.addr_map = {}
 
-    def set(self, key_id, pub_key, addr):
-        assert key_id not in self.node_map.keys()
-        self.node_map[key_id] = pub_key
-        self.addr_map[key_id] = addr
+    def set(self, node_id, pub_key, addr):
+        assert node_id not in self.node_map.keys()
+        self.node_map[node_id] = pub_key
+        self.addr_map[node_id] = addr
 
-    def get(self, key_id):
-        return self.node_map[key_id]
+    def get(self, node_id):
+        return self.node_map[node_id]
 
     def identities(self):
         return self.node_map.keys()
 
-    def get_mix_addr(self, transport_name, key_id):
-        return self.addr_map[key_id]
+    def get_mix_addr(self, transport_name, node_id):
+        return self.addr_map[node_id]
 
-    def rotate(self, key_id, new_key_id, new_pub_key, signature):
+    def rotate(self, node_id, new_pub_key, signature):
         pass
 
 
@@ -121,7 +129,6 @@ def test_sphinx_params():
 class TestSphinxCorrectness():
 
     def newTestRoute(self, numHops):
-        self.r = numHops
         self.pki = DummyPKI()
         rand_reader = RandReader()
         self.private_key_map = {}
@@ -207,7 +214,7 @@ class TestSphinxCorrectness():
 
 class TestSphinxEnd2End():
 
-    def setUpMixVectors(self, rand_reader, client_id=None):
+    def setUpMixVectors(self, rand_reader, client_id):
         hexedState = [
             {
                 "id": binascii.unhexlify("ff2182654d0000000000000000000000"),
@@ -236,7 +243,6 @@ class TestSphinxEnd2End():
             },
 
         ]
-        self.r = 5
         self.pki = DummyPKI()
         self.route = []
         params = SphinxParams(5, 1024)
@@ -255,9 +261,7 @@ class TestSphinxEnd2End():
             key_state = SphinxNodeKeyState(hexedState[i]['private_key'])
             self.key_state_map[hexedState[i]['id']] = key_state
         # Create a client
-        params = SphinxParams(5, 1024)
-        self.alice_client = SphinxClient(params, id=client_id,
-                                         rand_reader=rand_reader)
+        self.alice_client = SphinxClient(params, client_id, rand_reader)
 
     def test_sphinx_replay(self):
         rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
@@ -275,9 +279,9 @@ class TestSphinxEnd2End():
         py.test.raises(ReplayError, sphinx_packet_unwrap, params, replay_cache, key_state, packet)
 
     def test_client_surb(self):
-        rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
+        rand_reader = FixedNoiseReader("b2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
 
-        self.setUpMixVectors(rand_reader)
+        self.setUpMixVectors(rand_reader, client_id=b"Client b5451d2e")
         nym_id = b"Cypherpunk"
         nym_tuple = self.alice_client.create_nym(self.route, self.pki)
         self.nymserver.add_surb(nym_id, nym_tuple)
@@ -356,7 +360,7 @@ class TestSphinxEnd2End():
 
     def test_sphinx_corrupted_process_message(self):
         rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
-        self.setUpMixVectors(rand_reader)
+        self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
         destination = b"dest"
         message = b"this is a test"
         rand_reader = RandReader()
@@ -424,15 +428,17 @@ def create_invalid_message(params, route, node_map, dest, msg, rand_reader):
 def test_client_invalid_key():
     params = SphinxParams(5, 1024)
     message_id = "fake message id"
-    client = SphinxClient(params, id="client id")
+    rand_reader = FixedNoiseReader("FA")
+    client = SphinxClient(params, "client id", rand_reader=rand_reader)
     py.test.raises(NymKeyNotFoundError, client.decrypt, message_id, "fake delta")
 
 
 def test_client_corrupt_message():
     params = SphinxParams(5, 1024)
     message_id = b"fake message id"
-    client = SphinxClient(params, id=b"client id")
-    client.keytable[message_id] = [b"A" * 32]
+    rand_reader = FixedNoiseReader("FA")
+    client = SphinxClient(params, b"client id", rand_reader=rand_reader)
+    client._keytable[message_id] = [b"A" * 32]
     py.test.raises(CorruptMessageError, client.decrypt, message_id, b"A" * 1024)
 
 
