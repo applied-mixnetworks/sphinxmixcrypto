@@ -34,26 +34,6 @@ from sphinxmixcrypto.errors import InvalidProcessDestinationError, InvalidMessag
 from sphinxmixcrypto.errors import SphinxBodySizeMismatchError
 
 
-
-def sphinx_packet_decode(params, raw_packet):
-    alpha, beta, gamma, delta = params.get_dimensions()
-    _alpha = raw_packet[:alpha]
-    _beta = raw_packet[alpha:alpha + beta]
-    _gamma = raw_packet[alpha + beta:alpha + beta + gamma]
-    _delta = raw_packet[alpha + beta + gamma:]
-    sphinx_packet = SphinxPacket(SphinxHeader(_alpha, _beta, _gamma), SphinxBody(_delta))
-    return sphinx_packet
-
-
-def sphinx_packet_encode(params, alpha, beta, gamma, delta):
-    alpha_len, beta_len, gamma_len, delta_len = params.get_dimensions()
-    assert alpha_len == len(alpha)
-    assert beta_len == len(beta)
-    assert gamma_len == len(gamma)
-    assert delta_len == len(delta)
-    return alpha + beta + gamma + delta
-
-
 @attr.s(frozen=True)
 class SphinxParams(object):
 
@@ -111,6 +91,27 @@ class SphinxPacket(object):
     """
     header = attr.ib(validator=attr.validators.instance_of(SphinxHeader))
     body = attr.ib(validator=attr.validators.instance_of(SphinxBody))
+
+    def get_raw_bytes(self):
+        """
+        Get all the bytes.
+        """
+        return self.header.alpha + self.header.beta + \
+            self.header.gamma + self.body.delta
+
+    @classmethod
+    def from_raw_bytes(cls, params, raw_packet):
+        """
+        Create a SphinxPacket given the raw bytes and
+        an instance of SphinxParams.
+        """
+        assert isinstance(params, SphinxParams)
+        alpha, beta, gamma, delta = params.get_dimensions()
+        _alpha = raw_packet[:alpha]
+        _beta = raw_packet[alpha:alpha + beta]
+        _gamma = raw_packet[alpha + beta:alpha + beta + gamma]
+        _delta = raw_packet[alpha + beta + gamma:]
+        return cls(SphinxHeader(_alpha, _beta, _gamma), SphinxBody(_delta))
 
 
 @attr.s(frozen=True)

@@ -20,7 +20,6 @@ from sphinxmixcrypto.node import UnwrappedMessage, SphinxPacket, SphinxBody
 from sphinxmixcrypto.padding import add_padding
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxDigest, SECURITY_PARAMETER
 from sphinxmixcrypto.errors import SphinxNoSURBSAvailableError
-from sphinxmixcrypto import sphinx_packet_decode
 
 
 class NymResult:
