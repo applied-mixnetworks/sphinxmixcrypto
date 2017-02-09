@@ -5,8 +5,7 @@ import binascii
 import os
 
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, GroupCurve25519
-from sphinxmixcrypto import SphinxHeader, SphinxBody, SphinxPacket
-from sphinxmixcrypto import sphinx_packet_unwrap, SphinxPacket
+from sphinxmixcrypto import SphinxHeader, SphinxBody, SphinxPacket, sphinx_packet_unwrap
 from sphinxmixcrypto import PacketReplayCacheDict, ReplayError, SECURITY_PARAMETER, create_header
 from sphinxmixcrypto import IncorrectMACError, HeaderAlphaGroupMismatchError, destination_encode
 from sphinxmixcrypto import add_padding, InvalidProcessDestinationError, InvalidMessageTypeError, SphinxBodySizeMismatchError
@@ -207,7 +206,7 @@ class TestSphinxCorrectness():
                          packet.header.beta,
                          packet.header.gamma),
             packet.body
-            )
+        )
         replay_cache = PacketReplayCacheDict()
         public_key, private_key = generate_node_keypair(rand_reader)
         key_state = SphinxNodeKeyState(private_key)
@@ -272,7 +271,7 @@ class TestSphinxEnd2End():
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
         packet = create_forward_message(params, self.route, self.pki,
-                                                           self.route[-1], message, rand_reader)
+                                        self.route[-1], message, rand_reader)
         replay_cache = PacketReplayCacheDict()
         key_state = SphinxNodeKeyState(self.private_key_map[self.route[0]])
 
@@ -334,7 +333,7 @@ class TestSphinxEnd2End():
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
         packet = create_forward_message(params, self.route, self.pki,
-                                                           self.route[-1], message, rand_reader)
+                                        self.route[-1], message, rand_reader)
         replay_cache = PacketReplayCacheDict()
         key_state = SphinxNodeKeyState(self.private_key_map[self.route[0]])
         result = sphinx_packet_unwrap(params, replay_cache, key_state, packet)
@@ -378,7 +377,7 @@ class TestSphinxEnd2End():
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
         packet = create_invalid_message(params, self.route, self.pki,
-                                                           self.route[-1], message, rand_reader)
+                                        self.route[-1], message, rand_reader)
         replay_cache = PacketReplayCacheDict()
         key_state = SphinxNodeKeyState(self.private_key_map[self.route[0]])
         result = sphinx_packet_unwrap(params, replay_cache, key_state, packet)
