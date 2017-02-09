@@ -177,7 +177,7 @@ class TestSphinxCorrectness():
         rand_reader = RandReader()
         params = SphinxParams(5, 1024)
         packet = create_forward_message(params, route, self.pki, destination, message, rand_reader)
-        packet = SphinxPacket(packet.header, SphinxBody("something else"))
+        packet = SphinxPacket(packet.header, SphinxBody(b"something else"))
         replay_cache = PacketReplayCacheDict()
         key_state = SphinxNodeKeyState(self.private_key_map[route[0]])
         py.test.raises(SphinxBodySizeMismatchError, sphinx_packet_unwrap, params, replay_cache, key_state, packet)
