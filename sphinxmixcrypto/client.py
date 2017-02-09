@@ -38,17 +38,17 @@ def create_header(params, route, pki, dest, message_id, rand_reader):
     """
     Create a sphinx header, used to construct forward messages and reply blocks.
 
-    :param params: An instance of SphinxParams.
+    :param SphinxParams params: An instance of SphinxParams.
 
     :param route: A list of 16 byte mix node IDs.
 
-    :param pki: An implementation of IMixPKI.
+    :param pki: An IMixPKI provider.
 
     :param dest: A "prefix free encoded" destination type or client ID.
 
     :param message_id: Message identifier.
 
-    :param rand_reader: Source of entropy, an implementation of IReader.
+    :param rand_reader: Source of entropy, an IReader provider.
 
     :returns: a 2-tuple, a SphinxHeader and a list of shared secrets
     for each hop in the route.
@@ -105,17 +105,17 @@ def create_forward_message(params, route, pki, dest, plaintext_message, rand_rea
     """
     Create a new SphinxPacket, a forward message.
 
-    :param params: An instance of SphinxParams.
+    :param SphinxParams params: An instance of SphinxParams.
 
     :param route: A list of 16 byte mix node IDs.
 
-    :param pki: An implementation of IMixPKI.
+    :param pki: An IMixPKI provider.
 
     :param dest: A "prefix free encoded" destination type or client ID.
 
     :param plaintext_message: The plaintext message.
 
-    :param rand_reader: Source of entropy, an implementation of IReader.
+    :param rand_reader: Source of entropy, an IReader provider.
 
     :returns: a SphinxPacket.
     """
@@ -147,17 +147,17 @@ def create_reply_block(params, route, pki, dest, rand_reader):
     Create a single use reply block, a SURB. Reply blocks are used
     to achieve recipient anonymity.
 
-    :param params: An instance of SphinxParams.
+    :param SphinxParams params: An instance of SphinxParams.
 
     :param route: A list of 16 byte mix node IDs.
 
-    :param pki: An implementation of IMixPKI.
+    :param pki: An IMixPKI provider.
 
     :param dest: A "prefix free encoded" destination type or client ID.
 
     :param plaintext_message: The plaintext message.
 
-    :param rand_reader: Source of entropy, an implementation of IReader.
+    :param rand_reader: Source of entropy, an IReader provider.
 
     :returns: a 3-tuple, a 16 byte message ID, key tuple and reply block tuple
     """
