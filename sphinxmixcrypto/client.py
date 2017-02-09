@@ -18,7 +18,7 @@
 
 import attr
 
-from sphinxmixcrypto.node import SphinxParams, SphinxHeader, SphinxBody, SphinxPacket
+from sphinxmixcrypto.crypto_primitives import CURVE25519_SIZE
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, xor
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxStreamCipher, SphinxDigest, GroupCurve25519
 from sphinxmixcrypto.padding import add_padding, remove_padding
@@ -32,6 +32,45 @@ def destination_encode(dest):
     """
     assert len(dest) >= 1 and len(dest) <= 127
     return b"%c" % len(dest) + dest
+
+
+@attr.s(frozen=True)
+class SphinxParams(object):
+
+    max_hops = attr.ib(validator=attr.validators.instance_of(int))
+    payload_size = attr.ib(validator=attr.validators.instance_of(int))
+
+    @property
+    def beta_cipher_size(self):
+        """
+        i am a helper method that is used to compute the size of the
+        stream cipher output used in sphinx packet operations
+        """
+        return CURVE25519_SIZE + (2 * self.max_hops + 1) * SECURITY_PARAMETER
+
+    def get_dimensions(self):
+        """
+        i am a helper method that returns the sphinx packet element sizes, a 4-tuple.
+        e.g. payload = 1024 && 5 hops ==
+        alpha 32 beta 176 gamma 16 delta 1024
+        """
+        alpha = CURVE25519_SIZE
+        beta = (2 * self.max_hops + 1) * SECURITY_PARAMETER
+        gamma = SECURITY_PARAMETER
+        delta = self.payload_size
+        return alpha, beta, gamma, delta
+
+
+@attr.s(frozen=True)
+class SphinxHeader(object):
+    """
+    The Sphinx header.
+
+    The Sphinx paper refers to the header fields as the greek letters: alpha, beta and gamma.
+    """
+    alpha = attr.ib(validator=attr.validators.instance_of(bytes))
+    beta = attr.ib(validator=attr.validators.instance_of(bytes))
+    gamma = attr.ib(validator=attr.validators.instance_of(bytes))
 
 
 def create_header(params, route, pki, dest, message_id, rand_reader):
@@ -101,45 +140,86 @@ def create_header(params, route, pki, dest, message_id, rand_reader):
     return sphinx_header, [y['s'] for y in asbtuples]
 
 
-def create_forward_message(params, route, pki, dest, plaintext_message, rand_reader):
+@attr.s(frozen=True)
+class SphinxBody(object):
     """
-    Create a new SphinxPacket, a forward message.
+    A Sphinx has the body of a lion or lioness.  The sphinx packet
+    body is repeated encrypted with the lioness wide-block cipher.
 
-    :param SphinxParams params: An instance of SphinxParams.
-
-    :param route: A list of 16 byte mix node IDs.
-
-    :param pki: An IMixPKI provider.
-
-    :param dest: A "prefix free encoded" destination type or client ID.
-
-    :param plaintext_message: The plaintext message.
-
-    :param rand_reader: Source of entropy, an IReader provider.
-
-    :returns: a SphinxPacket.
+    The Sphinx paper refers to this field of the packet as the greek letter delta.
     """
-    assert IMixPKI.providedBy(pki)
+    delta = attr.ib(validator=attr.validators.instance_of(bytes))
 
-    route_len = len(route)
-    assert len(dest) < 128 and len(dest) > 0
-    assert SECURITY_PARAMETER + 1 + len(dest) + len(plaintext_message) < params.payload_size
-    block_cipher = SphinxLioness()
 
-    # Compute the header and the secrets
-    header, secrets = create_header(params, route, pki, b"\x00", b"\x00" * SECURITY_PARAMETER, rand_reader)
-    encoded_dest = destination_encode(dest)
-    body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(plaintext_message)
-    padded_body = add_padding(body, params.payload_size)
+@attr.s(frozen=True)
+class SphinxPacket(object):
+    """
+    I am a decoded sphinx packet
+    """
+    header = attr.ib(validator=attr.validators.instance_of(SphinxHeader))
+    body = attr.ib(validator=attr.validators.instance_of(SphinxBody))
 
-    # Compute the delta values
-    block_cipher = SphinxLioness()
-    key = block_cipher.create_block_cipher_key(secrets[route_len - 1])
-    delta = block_cipher.encrypt(key, padded_body)
-    for i in range(route_len - 2, -1, -1):
-        delta = block_cipher.encrypt(block_cipher.create_block_cipher_key(secrets[i]), delta)
+    def get_raw_bytes(self):
+        """
+        Get all the bytes.
+        """
+        return self.header.alpha + self.header.beta + \
+            self.header.gamma + self.body.delta
 
-    return SphinxPacket(header=header, body=SphinxBody(delta))
+    @classmethod
+    def from_raw_bytes(cls, params, raw_packet):
+        """
+        Create a SphinxPacket given the raw bytes and
+        an instance of SphinxParams.
+        """
+        assert isinstance(params, SphinxParams)
+        alpha, beta, gamma, delta = params.get_dimensions()
+        _alpha = raw_packet[:alpha]
+        _beta = raw_packet[alpha:alpha + beta]
+        _gamma = raw_packet[alpha + beta:alpha + beta + gamma]
+        _delta = raw_packet[alpha + beta + gamma:]
+        return cls(SphinxHeader(_alpha, _beta, _gamma), SphinxBody(_delta))
+
+    @classmethod
+    def forward_message(cls, params, route, pki, dest, plaintext_message, rand_reader):
+        """
+        Create a new SphinxPacket, a forward message.
+
+        :param SphinxParams params: An instance of SphinxParams.
+
+        :param route: A list of 16 byte mix node IDs.
+
+        :param pki: An IMixPKI provider.
+
+        :param dest: A "prefix free encoded" destination type or client ID.
+
+        :param plaintext_message: The plaintext message.
+
+        :param rand_reader: Source of entropy, an IReader provider.
+
+        :returns: a SphinxPacket.
+        """
+        assert IMixPKI.providedBy(pki)
+
+        route_len = len(route)
+        assert len(dest) < 128 and len(dest) > 0
+        assert SECURITY_PARAMETER + 1 + len(dest) + len(plaintext_message) < params.payload_size
+        block_cipher = SphinxLioness()
+
+        # Compute the header and the secrets
+        header, secrets = create_header(params, route, pki, b"\x00", b"\x00" * SECURITY_PARAMETER, rand_reader)
+        encoded_dest = destination_encode(dest)
+        body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(plaintext_message)
+        padded_body = add_padding(body, params.payload_size)
+
+        # Compute the delta values
+        block_cipher = SphinxLioness()
+        key = block_cipher.create_block_cipher_key(secrets[route_len - 1])
+        delta = block_cipher.encrypt(key, padded_body)
+        for i in range(route_len - 2, -1, -1):
+            delta = block_cipher.encrypt(block_cipher.create_block_cipher_key(secrets[i]), delta)
+
+        return cls(header, SphinxBody(delta))
 
 
 def create_reply_block(params, route, pki, dest, rand_reader):

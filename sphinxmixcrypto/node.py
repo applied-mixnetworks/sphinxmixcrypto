@@ -25,6 +25,7 @@ This module includes cryptographic unwrapping of messages for mix net nodes
 import zope.interface
 import attr
 
+from sphinxmixcrypto.client import SphinxPacket, SphinxHeader, SphinxBody, SphinxParams
 from sphinxmixcrypto.padding import remove_padding
 from sphinxmixcrypto.interfaces import IPacketReplayCache, IKeyState
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, GroupCurve25519, SphinxDigest
@@ -32,86 +33,6 @@ from sphinxmixcrypto.crypto_primitives import SphinxStreamCipher, SphinxLioness,
 from sphinxmixcrypto.errors import HeaderAlphaGroupMismatchError, ReplayError, IncorrectMACError
 from sphinxmixcrypto.errors import InvalidProcessDestinationError, InvalidMessageTypeError
 from sphinxmixcrypto.errors import SphinxBodySizeMismatchError
-
-
-@attr.s(frozen=True)
-class SphinxParams(object):
-
-    max_hops = attr.ib(validator=attr.validators.instance_of(int))
-    payload_size = attr.ib(validator=attr.validators.instance_of(int))
-
-    @property
-    def beta_cipher_size(self):
-        """
-        i am a helper method that is used to compute the size of the
-        stream cipher output used in sphinx packet operations
-        """
-        return CURVE25519_SIZE + (2 * self.max_hops + 1) * SECURITY_PARAMETER
-
-    def get_dimensions(self):
-        """
-        i am a helper method that returns the sphinx packet element sizes, a 4-tuple.
-        e.g. payload = 1024 && 5 hops ==
-        alpha 32 beta 176 gamma 16 delta 1024
-        """
-        alpha = CURVE25519_SIZE
-        beta = (2 * self.max_hops + 1) * SECURITY_PARAMETER
-        gamma = SECURITY_PARAMETER
-        delta = self.payload_size
-        return alpha, beta, gamma, delta
-
-
-@attr.s(frozen=True)
-class SphinxHeader(object):
-    """
-    The Sphinx header.
-
-    The Sphinx paper refers to the header fields as the greek letters: alpha, beta and gamma.
-    """
-    alpha = attr.ib(validator=attr.validators.instance_of(bytes))
-    beta = attr.ib(validator=attr.validators.instance_of(bytes))
-    gamma = attr.ib(validator=attr.validators.instance_of(bytes))
-
-
-@attr.s(frozen=True)
-class SphinxBody(object):
-    """
-    A Sphinx has the body of a lion or lioness.  The sphinx packet
-    body is repeated encrypted with the lioness wide-block cipher.
-
-    The Sphinx paper refers to this field of the packet as the greek letter delta.
-    """
-    delta = attr.ib(validator=attr.validators.instance_of(bytes))
-
-
-@attr.s(frozen=True)
-class SphinxPacket(object):
-    """
-    I am a decoded sphinx packet
-    """
-    header = attr.ib(validator=attr.validators.instance_of(SphinxHeader))
-    body = attr.ib(validator=attr.validators.instance_of(SphinxBody))
-
-    def get_raw_bytes(self):
-        """
-        Get all the bytes.
-        """
-        return self.header.alpha + self.header.beta + \
-            self.header.gamma + self.body.delta
-
-    @classmethod
-    def from_raw_bytes(cls, params, raw_packet):
-        """
-        Create a SphinxPacket given the raw bytes and
-        an instance of SphinxParams.
-        """
-        assert isinstance(params, SphinxParams)
-        alpha, beta, gamma, delta = params.get_dimensions()
-        _alpha = raw_packet[:alpha]
-        _beta = raw_packet[alpha:alpha + beta]
-        _gamma = raw_packet[alpha + beta:alpha + beta + gamma]
-        _delta = raw_packet[alpha + beta + gamma:]
-        return cls(SphinxHeader(_alpha, _beta, _gamma), SphinxBody(_delta))
 
 
 @attr.s(frozen=True)

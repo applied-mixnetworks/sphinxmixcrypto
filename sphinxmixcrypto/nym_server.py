@@ -16,7 +16,8 @@
 # License along with Sphinx.  If not, see
 # <http://www.gnu.org/licenses/>.
 
-from sphinxmixcrypto.node import UnwrappedMessage, SphinxPacket, SphinxBody
+from sphinxmixcrypto.node import UnwrappedMessage
+from sphinxmixcrypto.client import SphinxPacket, SphinxBody
 from sphinxmixcrypto.padding import add_padding
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxDigest, SECURITY_PARAMETER
 from sphinxmixcrypto.errors import SphinxNoSURBSAvailableError
