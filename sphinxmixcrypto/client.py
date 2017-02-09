@@ -18,7 +18,7 @@
 
 import attr
 
-from sphinxmixcrypto.node import SphinxParams
+from sphinxmixcrypto.node import SphinxParams, SphinxHeader, SphinxBody, SphinxPacket
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, xor
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxStreamCipher, SphinxDigest, GroupCurve25519
 from sphinxmixcrypto.padding import add_padding, remove_padding
@@ -35,6 +35,24 @@ def destination_encode(dest):
 
 
 def create_header(params, route, pki, dest, message_id, rand_reader):
+    """
+    Create a sphinx header, used to construct forward messages and reply blocks.
+
+    :param params: An instance of SphinxParams.
+
+    :param route: A list of 16 byte mix node IDs.
+
+    :param pki: An implementation of IMixPKI.
+
+    :param dest: A "prefix free encoded" destination type or client ID.
+
+    :param message_id: Message identifier.
+
+    :param rand_reader: Source of entropy, an implementation of IReader.
+
+    :returns: a 2-tuple, a SphinxHeader and a list of shared secrets
+    for each hop in the route.
+    """
     assert IMixPKI.providedBy(pki)
     route_len = len(route)
     assert len(dest) <= 2 * (params.max_hops - route_len + 1) * SECURITY_PARAMETER
@@ -79,21 +97,39 @@ def create_header(params, route, pki, dest, message_id, rand_reader):
         beta = xor(message_id + gamma + beta[:(2 * params.max_hops - 1) * SECURITY_PARAMETER],
                    stream_cipher.generate_stream(stream_key, params.beta_cipher_size)[:(2 * params.max_hops + 1) * SECURITY_PARAMETER])
         gamma = digest.hmac(digest.create_hmac_key(asbtuples[i]['s']), beta)
-    return (asbtuples[0]['alpha'], beta, gamma), [y['s'] for y in asbtuples]
+    sphinx_header = SphinxHeader(asbtuples[0]['alpha'], beta, gamma)
+    return sphinx_header, [y['s'] for y in asbtuples]
 
 
-def create_forward_message(params, route, pki, dest, msg, rand_reader):
+def create_forward_message(params, route, pki, dest, plaintext_message, rand_reader):
+    """
+    Create a new SphinxPacket, a forward message.
+
+    :param params: An instance of SphinxParams.
+
+    :param route: A list of 16 byte mix node IDs.
+
+    :param pki: An implementation of IMixPKI.
+
+    :param dest: A "prefix free encoded" destination type or client ID.
+
+    :param plaintext_message: The plaintext message.
+
+    :param rand_reader: Source of entropy, an implementation of IReader.
+
+    :returns: a SphinxPacket.
+    """
     assert IMixPKI.providedBy(pki)
 
     route_len = len(route)
     assert len(dest) < 128 and len(dest) > 0
-    assert SECURITY_PARAMETER + 1 + len(dest) + len(msg) < params.payload_size
+    assert SECURITY_PARAMETER + 1 + len(dest) + len(plaintext_message) < params.payload_size
     block_cipher = SphinxLioness()
 
     # Compute the header and the secrets
     header, secrets = create_header(params, route, pki, b"\x00", b"\x00" * SECURITY_PARAMETER, rand_reader)
     encoded_dest = destination_encode(dest)
-    body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(msg)
+    body = (b"\x00" * SECURITY_PARAMETER) + bytes(encoded_dest) + bytes(plaintext_message)
     padded_body = add_padding(body, params.payload_size)
 
     # Compute the delta values
@@ -102,13 +138,28 @@ def create_forward_message(params, route, pki, dest, msg, rand_reader):
     delta = block_cipher.encrypt(key, padded_body)
     for i in range(route_len - 2, -1, -1):
         delta = block_cipher.encrypt(block_cipher.create_block_cipher_key(secrets[i]), delta)
-    alpha, beta, gamma = header
-    return alpha, beta, gamma, delta
+
+    return SphinxPacket(header=header, body=SphinxBody(delta))
 
 
-def create_surb(params, route, pki, dest, rand_reader):
+def create_reply_block(params, route, pki, dest, rand_reader):
     """
-    returns -> 16 byte message ID, key tuple, nym tuple w/ header
+    Create a single use reply block, a SURB. Reply blocks are used
+    to achieve recipient anonymity.
+
+    :param params: An instance of SphinxParams.
+
+    :param route: A list of 16 byte mix node IDs.
+
+    :param pki: An implementation of IMixPKI.
+
+    :param dest: A "prefix free encoded" destination type or client ID.
+
+    :param plaintext_message: The plaintext message.
+
+    :param rand_reader: Source of entropy, an implementation of IReader.
+
+    :returns: a 3-tuple, a 16 byte message ID, key tuple and reply block tuple
     """
     assert IMixPKI.providedBy(pki)
 
@@ -148,7 +199,7 @@ class SphinxClient(object):
         """
         assert IMixPKI.providedBy(pki)
 
-        message_id, keytuple, nymtuple = create_surb(self.params, route, pki, self.client_id, self.rand_reader)
+        message_id, keytuple, nymtuple = create_reply_block(self.params, route, pki, self.client_id, self.rand_reader)
         self._keytable[message_id] = keytuple
         return nymtuple
 
@@ -170,7 +221,7 @@ class SphinxClient(object):
         )
 
         if delta[:SECURITY_PARAMETER] == (b"\x00" * SECURITY_PARAMETER):
-            msg = remove_padding(delta[SECURITY_PARAMETER:])
-            return ClientMessage(identity=self.client_id, payload=msg)
+            plaintext_message = remove_padding(delta[SECURITY_PARAMETER:])
+            return ClientMessage(identity=self.client_id, payload=plaintext_message)
 
         raise CorruptMessageError

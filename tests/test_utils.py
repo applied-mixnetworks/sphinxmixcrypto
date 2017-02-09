@@ -14,10 +14,10 @@ def test_sphinx_packet_encode_decode():
     assert len(packet) == 1248
 
     decoded_packet = sphinx_packet_decode(params, packet)
-    assert len(decoded_packet.alpha) == 32
-    assert len(decoded_packet.beta) == 176
-    assert len(decoded_packet.gamma) == 16
-    assert len(decoded_packet.delta) == 1024
+    assert len(decoded_packet.header.alpha) == 32
+    assert len(decoded_packet.header.beta) == 176
+    assert len(decoded_packet.header.gamma) == 16
+    assert len(decoded_packet.body.delta) == 1024
 
     params = SphinxParams(10, 1024)
     alpha = b"A" * 32
@@ -28,10 +28,10 @@ def test_sphinx_packet_encode_decode():
     assert len(packet) == 1408
 
     decoded_packet = sphinx_packet_decode(params, packet)
-    assert len(decoded_packet.alpha) == 32
-    assert len(decoded_packet.beta) == 336
-    assert len(decoded_packet.gamma) == 16
-    assert len(decoded_packet.delta) == 1024
+    assert len(decoded_packet.header.alpha) == 32
+    assert len(decoded_packet.header.beta) == 336
+    assert len(decoded_packet.header.gamma) == 16
+    assert len(decoded_packet.body.delta) == 1024
 
     params = SphinxParams(10, 2048)
     alpha = b"A" * 32
@@ -42,10 +42,10 @@ def test_sphinx_packet_encode_decode():
     assert len(packet) == 2432
 
     decoded_packet = sphinx_packet_decode(params, packet)
-    assert len(decoded_packet.alpha) == 32
-    assert len(decoded_packet.beta) == 336
-    assert len(decoded_packet.gamma) == 16
-    assert len(decoded_packet.delta) == 2048
+    assert len(decoded_packet.header.alpha) == 32
+    assert len(decoded_packet.header.beta) == 336
+    assert len(decoded_packet.header.gamma) == 16
+    assert len(decoded_packet.body.delta) == 2048
 
 
 def test_prefix_free_decode():

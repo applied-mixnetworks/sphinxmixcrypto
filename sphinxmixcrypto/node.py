@@ -35,13 +35,13 @@ from sphinxmixcrypto.errors import SphinxBodySizeMismatchError
 
 
 
-def sphinx_packet_decode(params, packet):
+def sphinx_packet_decode(params, raw_packet):
     alpha, beta, gamma, delta = params.get_dimensions()
-    _alpha = packet[:alpha]
-    _beta = packet[alpha:alpha + beta]
-    _gamma = packet[alpha + beta:alpha + beta + gamma]
-    _delta = packet[alpha + beta + gamma:]
-    sphinx_packet = SphinxPacket(_alpha, _beta, _gamma, _delta)
+    _alpha = raw_packet[:alpha]
+    _beta = raw_packet[alpha:alpha + beta]
+    _gamma = raw_packet[alpha + beta:alpha + beta + gamma]
+    _delta = raw_packet[alpha + beta + gamma:]
+    sphinx_packet = SphinxPacket(SphinxHeader(_alpha, _beta, _gamma), SphinxBody(_delta))
     return sphinx_packet
 
 
@@ -82,14 +82,35 @@ class SphinxParams(object):
 
 
 @attr.s(frozen=True)
-class SphinxPacket(object):
+class SphinxHeader(object):
     """
-    I am a decoded sphinx packet
+    The Sphinx header.
+
+    The Sphinx paper refers to the header fields as the greek letters: alpha, beta and gamma.
     """
     alpha = attr.ib(validator=attr.validators.instance_of(bytes))
     beta = attr.ib(validator=attr.validators.instance_of(bytes))
     gamma = attr.ib(validator=attr.validators.instance_of(bytes))
+
+
+@attr.s(frozen=True)
+class SphinxBody(object):
+    """
+    A Sphinx has the body of a lion or lioness.  The sphinx packet
+    body is repeated encrypted with the lioness wide-block cipher.
+
+    The Sphinx paper refers to this field of the packet as the greek letter delta.
+    """
     delta = attr.ib(validator=attr.validators.instance_of(bytes))
+
+
+@attr.s(frozen=True)
+class SphinxPacket(object):
+    """
+    I am a decoded sphinx packet
+    """
+    header = attr.ib(validator=attr.validators.instance_of(SphinxHeader))
+    body = attr.ib(validator=attr.validators.instance_of(SphinxBody))
 
 
 @attr.s(frozen=True)
@@ -147,35 +168,39 @@ def sphinx_packet_unwrap(params, replay_cache, key_state, sphinx_packet):
     cache, private key and a packet or raises an exception if an error
     was encountered
     """
+    assert isinstance(params, SphinxParams)
     assert IPacketReplayCache.providedBy(replay_cache)
     assert IKeyState.providedBy(key_state)
     assert isinstance(sphinx_packet, SphinxPacket)
 
-    if len(sphinx_packet.delta) != params.payload_size:
+    if len(sphinx_packet.body.delta) != params.payload_size:
         raise SphinxBodySizeMismatchError()
     group = GroupCurve25519()
     digest = SphinxDigest()
     stream_cipher = SphinxStreamCipher()
     block_cipher = SphinxLioness()
-    if not group.in_group(sphinx_packet.alpha):
+    if not group.in_group(sphinx_packet.header.alpha):
         raise HeaderAlphaGroupMismatchError()
-    s = group.expon(sphinx_packet.alpha, key_state.get_private_key())
+    s = group.expon(sphinx_packet.header.alpha, key_state.get_private_key())
     tag = digest.hash_replay(s)
     if replay_cache.has_seen(tag):
         raise ReplayError()
-    if sphinx_packet.gamma != digest.hmac(digest.create_hmac_key(s), sphinx_packet.beta):
+    if sphinx_packet.header.gamma != digest.hmac(digest.create_hmac_key(s), sphinx_packet.header.beta):
         raise IncorrectMACError()
     replay_cache.set_seen(tag)
-    payload = block_cipher.decrypt(block_cipher.create_block_cipher_key(s), sphinx_packet.delta)
-    B = xor(sphinx_packet.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s), params.beta_cipher_size))
+    payload = block_cipher.decrypt(block_cipher.create_block_cipher_key(s), sphinx_packet.body.delta)
+    B = xor(sphinx_packet.header.beta + (b"\x00" * (2 * SECURITY_PARAMETER)), stream_cipher.generate_stream(digest.create_stream_cipher_key(s), params.beta_cipher_size))
     message_type, val, rest = prefix_free_decode(B)
 
     if message_type == "mix":
-        b = digest.hash_blinding(sphinx_packet.alpha, s)
-        alpha = group.expon(sphinx_packet.alpha, b)
+        b = digest.hash_blinding(sphinx_packet.header.alpha, s)
+        alpha = group.expon(sphinx_packet.header.alpha, b)
         gamma = B[SECURITY_PARAMETER:SECURITY_PARAMETER * 2]
         beta = B[SECURITY_PARAMETER * 2:]
-        unwrapped_sphinx_packet = SphinxPacket(alpha=alpha, beta=beta, gamma=gamma, delta=payload)
+        unwrapped_sphinx_packet = SphinxPacket(
+            header=SphinxHeader(alpha, beta, gamma),
+            body=SphinxBody(payload)
+        )
         result = UnwrappedMessage(next_hop = (val, unwrapped_sphinx_packet), exit_hop=None, client_hop=None)
         return result
     elif message_type == "process":
@@ -189,6 +214,6 @@ def sphinx_packet_unwrap(params, replay_cache, key_state, sphinx_packet):
         raise InvalidProcessDestinationError()
     elif message_type == "client":
         id = rest[:SECURITY_PARAMETER]
-        result = UnwrappedMessage(client_hop = (val, id, payload), exit_hop=None, next_hop=None)
+        result = UnwrappedMessage(client_hop = (val, id, SphinxBody(payload)), exit_hop=None, next_hop=None)
         return result
     raise InvalidMessageTypeError()

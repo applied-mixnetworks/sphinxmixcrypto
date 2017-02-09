@@ -15,9 +15,9 @@ from pylioness._metadata import __license__, __copyright__, __url__
 from sphinxmixcrypto.errors import CorruptMessageError, NymKeyNotFoundError, IncorrectMACError, SphinxNoSURBSAvailableError
 from sphinxmixcrypto.errors import ReplayError, HeaderAlphaGroupMismatchError, InvalidMessageTypeError, SphinxBodySizeMismatchError
 from sphinxmixcrypto.client import SphinxClient, create_forward_message, create_header
-from sphinxmixcrypto.client import create_surb, ClientMessage, destination_encode
+from sphinxmixcrypto.client import create_reply_block, ClientMessage, destination_encode
 from sphinxmixcrypto.node import sphinx_packet_unwrap, prefix_free_decode
-from sphinxmixcrypto.node import SphinxPacket, SECURITY_PARAMETER
+from sphinxmixcrypto.node import SphinxPacket, SphinxHeader, SphinxBody, SECURITY_PARAMETER
 from sphinxmixcrypto.node import PacketReplayCacheDict
 from sphinxmixcrypto.node import InvalidProcessDestinationError
 from sphinxmixcrypto.node import UnwrappedMessage
@@ -29,7 +29,6 @@ from sphinxmixcrypto.interfaces import IReader, IMixPKI, IPacketReplayCache, IKe
 
 __all__ = [
     "SECURITY_PARAMETER",
-    "DSPEC",
 
     "ReplayError",
     "NymKeyNotFoundError",
@@ -47,6 +46,8 @@ __all__ = [
     "IReader",
 
     "SphinxPacket",
+    "SphinxHeader",
+    "SphinxBody",
     "ClientMessage",
     "SphinxParams",
     "SphinxClient",
@@ -62,7 +63,7 @@ __all__ = [
     "sphinx_packet_encode",
     "sphinx_packet_unwrap",
     "create_forward_message",
-    "create_surb",
+    "create_reply_block",
 
     "create_header",
     "add_padding",
