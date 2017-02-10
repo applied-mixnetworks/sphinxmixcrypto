@@ -60,6 +60,19 @@ class SphinxParams(object):
         delta = self.payload_size
         return alpha, beta, gamma, delta
 
+    def elements_from_raw_bytes(self, raw_packet):
+        """
+        return the Sphinx packet elements, a 4-tuple
+        of byte slices: alpha, beta, gamma and delta.
+        """
+        alpha, beta, gamma, delta = self.get_dimensions()
+        assert len(raw_packet) == alpha + beta + gamma + delta
+        _alpha = raw_packet[:alpha]
+        _beta = raw_packet[alpha:alpha + beta]
+        _gamma = raw_packet[alpha + beta:alpha + beta + gamma]
+        _delta = raw_packet[alpha + beta + gamma:]
+        return _alpha, _beta, _gamma, _delta
+
 
 @attr.s(frozen=True)
 class SphinxHeader(object):
@@ -173,12 +186,8 @@ class SphinxPacket(object):
         an instance of SphinxParams.
         """
         assert isinstance(params, SphinxParams)
-        alpha, beta, gamma, delta = params.get_dimensions()
-        _alpha = raw_packet[:alpha]
-        _beta = raw_packet[alpha:alpha + beta]
-        _gamma = raw_packet[alpha + beta:alpha + beta + gamma]
-        _delta = raw_packet[alpha + beta + gamma:]
-        return cls(SphinxHeader(_alpha, _beta, _gamma), SphinxBody(_delta))
+        alpha, beta, gamma, delta = params.elements_from_raw_bytes(raw_packet)
+        return cls(SphinxHeader(alpha, beta, gamma), SphinxBody(delta))
 
     @classmethod
     def forward_message(cls, params, route, pki, dest, plaintext_message, rand_reader):
