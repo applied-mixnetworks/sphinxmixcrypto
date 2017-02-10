@@ -271,7 +271,7 @@ class TestSphinxEnd2End():
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
         packet = SphinxPacket.forward_message(params, self.route, self.pki,
-                                        self.route[-1], message, rand_reader)
+                                              self.route[-1], message, rand_reader)
         replay_cache = PacketReplayCacheDict()
         key_state = SphinxNodeKeyState(self.private_key_map[self.route[0]])
 
@@ -333,7 +333,7 @@ class TestSphinxEnd2End():
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
         packet = SphinxPacket.forward_message(params, self.route, self.pki,
-                                        self.route[-1], message, rand_reader)
+                                              self.route[-1], message, rand_reader)
         replay_cache = PacketReplayCacheDict()
         key_state = SphinxNodeKeyState(self.private_key_map[self.route[0]])
         result = sphinx_packet_unwrap(params, replay_cache, key_state, packet)

@@ -1,22 +1,6 @@
 Sphinx node cryptographic operations
 ====================================
 
-SphinxParams
-------------
-.. autoclass:: sphinxmixcrypto.SphinxParams
-
-SphinxHeader
-------------
-.. autoclass:: sphinxmixcrypto.SphinxHeader
-
-SphinxBody
-----------
-.. autoclass:: sphinxmixcrypto.SphinxBody
-
-SphinxPacket
-------------
-.. autoclass:: sphinxmixcrypto.SphinxPacket
-
 UnwrappedMessage
 ----------------
 .. autoclass:: sphinxmixcrypto.UnwrappedMessage

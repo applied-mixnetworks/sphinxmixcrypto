@@ -1,13 +1,25 @@
 Sphinx client cryptographic operations
 ======================================
 
+SphinxParams
+------------
+.. autoclass:: sphinxmixcrypto.SphinxParams
+
+SphinxHeader
+------------
+.. autoclass:: sphinxmixcrypto.SphinxHeader
+
+SphinxBody
+----------
+.. autoclass:: sphinxmixcrypto.SphinxBody
+
+SphinxPacket
+------------
+.. autoclass:: sphinxmixcrypto.SphinxPacket
+
 create_header
 -------------
 .. autofunction:: sphinxmixcrypto.create_header
-
-create_forward_message
-----------------------
-.. autofunction:: sphinxmixcrypto.create_forward_message
 
 create_reply_block
 ------------------
