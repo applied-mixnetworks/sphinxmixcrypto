@@ -102,8 +102,7 @@ def create_header(params, route, pki, dest, message_id, rand_reader):
 
     :param rand_reader: Source of entropy, an IReader provider.
 
-    :returns: a 2-tuple, a SphinxHeader and a list of shared secrets
-    for each hop in the route.
+    :returns: a 2-tuple, a SphinxHeader and a list of shared secrets for each hop in the route.
     """
     assert IMixPKI.providedBy(pki)
     route_len = len(route)
