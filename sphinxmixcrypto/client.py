@@ -176,7 +176,7 @@ class SphinxPacket(object):
         """
         Get all the bytes.
         """
-        return "".join((self.header.alpha, self.header.beta,
+        return b"".join((self.header.alpha, self.header.beta,
                         self.header.gamma, self.body.delta))
 
     @classmethod
