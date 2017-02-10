@@ -86,9 +86,20 @@ class PacketReplayCacheDict:
 
 def sphinx_packet_unwrap(params, replay_cache, key_state, sphinx_packet):
     """
-    sphinx_packet_unwrap returns a UnwrappedMessage given the replay
-    cache, private key and a packet or raises an exception if an error
-    was encountered
+    sphinx_packet_unwrap performs the decryption operation for mixes.
+    replayed packets and packets with bad MACs are rejected.
+    after unwrapping the message type is identified, the data is placed
+    in UnwrappedMessage's appropriate tuple.
+
+    :param SphinxParams params: An instance of SphinxParams.
+
+    :param replay_cache: An IPacketReplayCache provider.
+
+    :param key_state: An IKeyState provider.
+
+    :param SphinxPacket sphinx_packet: An instance of SphinxPacket.
+
+    :returns: an UnwrappedMessage.
     """
     assert isinstance(params, SphinxParams)
     assert IPacketReplayCache.providedBy(replay_cache)
