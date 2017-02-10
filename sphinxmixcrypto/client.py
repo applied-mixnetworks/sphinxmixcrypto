@@ -163,8 +163,8 @@ class SphinxPacket(object):
         """
         Get all the bytes.
         """
-        return self.header.alpha + self.header.beta + \
-            self.header.gamma + self.body.delta
+        return "".join((self.header.alpha, self.header.beta,
+                        self.header.gamma, self.body.delta))
 
     @classmethod
     def from_raw_bytes(cls, params, raw_packet):
