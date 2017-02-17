@@ -3,6 +3,20 @@
 from sphinxmixcrypto import prefix_free_decode, SECURITY_PARAMETER
 from sphinxmixcrypto import SphinxParams, SphinxPacket
 
+from sphinxmixcrypto.client import is_16bytes, is_32bytes
+
+import py.test
+
+
+def test_error_is_16bytes():
+    value = b"A" * 2
+    py.test.raises(ValueError, is_16bytes, None, None, value)
+
+
+def test_error_is_32bytes():
+    value = b"A" * 2
+    py.test.raises(ValueError, is_32bytes, None, None, value)
+
 
 def test_sphinx_packet_encode_decode():
     params = SphinxParams(5, 1024)
