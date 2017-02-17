@@ -269,7 +269,7 @@ class TestSphinxEnd2End():
         self.reply_route = []
         for s in hexedState:
             self.reply_route.append(s['id'])
-        dest = self.pki.identities()[0]
+        dest = list(self.pki.identities())[0]
         self.alice_decryption_token, self.reply_block = ReplyBlock.compose_reply_block(message_id, self.params, self.reply_route, self.pki, dest, rand_reader)
 
     def test_sphinx_replay(self):
