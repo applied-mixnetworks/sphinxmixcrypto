@@ -12,6 +12,7 @@ def test_sphinx_packet_encode_decode():
     delta = b"D" * 1024
     packet = SphinxPacket.from_raw_bytes(params, alpha + beta + gamma + delta)
     assert len(packet.get_raw_bytes()) == 1248
+    assert len(packet.get_raw_bytes()) == params.get_sphinx_forward_size()
     assert len(packet.header.alpha) == 32
     assert len(packet.header.beta) == 176
     assert len(packet.header.gamma) == 16
@@ -24,6 +25,7 @@ def test_sphinx_packet_encode_decode():
     delta = b"D" * 1024
     packet = SphinxPacket.from_raw_bytes(params, alpha + beta + gamma + delta)
     assert len(packet.get_raw_bytes()) == 1408
+    assert len(packet.get_raw_bytes()) == params.get_sphinx_forward_size()
     assert len(packet.header.alpha) == 32
     assert len(packet.header.beta) == 336
     assert len(packet.header.gamma) == 16
@@ -36,6 +38,7 @@ def test_sphinx_packet_encode_decode():
     delta = b"D" * 2048
     packet = SphinxPacket.from_raw_bytes(params, alpha + beta + gamma + delta)
     assert len(packet.get_raw_bytes()) == 2432
+    assert len(packet.get_raw_bytes()) == params.get_sphinx_forward_size()
     assert len(packet.header.alpha) == 32
     assert len(packet.header.beta) == 336
     assert len(packet.header.gamma) == 16

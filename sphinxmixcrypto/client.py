@@ -77,7 +77,7 @@ class SphinxParams(object):
         return alpha, beta, gamma, delta
 
     def get_sphinx_forward_size(self):
-        reduce(lambda a, b: a + b, self.get_dimensions())
+        return reduce(lambda a, b: a + b, self.get_dimensions(), 0)
 
     def elements_from_raw_bytes(self, raw_packet):
         """
