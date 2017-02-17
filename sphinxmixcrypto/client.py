@@ -22,8 +22,24 @@ from sphinxmixcrypto.crypto_primitives import CURVE25519_SIZE
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, xor
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, SphinxStreamCipher, SphinxDigest, GroupCurve25519
 from sphinxmixcrypto.padding import add_padding, remove_padding
-from sphinxmixcrypto.interfaces import IReader, IMixPKI
-from sphinxmixcrypto.errors import NymKeyNotFoundError, CorruptMessageError
+from sphinxmixcrypto.interfaces import IMixPKI
+from sphinxmixcrypto.errors import CorruptMessageError
+
+
+def is_16bytes(instance, attribute, value):
+    """
+    validator for a 16 byte value
+    """
+    if not isinstance(value, bytes) or len(value) != 16:
+        raise ValueError("must be 16 byte value")
+
+
+def is_32bytes(instance, attribute, value):
+    """
+    validator for a 32 byte value
+    """
+    if not isinstance(value, bytes) or len(value) != 32:
+        raise ValueError("must be 32 byte value")
 
 
 def destination_encode(dest):
@@ -60,6 +76,9 @@ class SphinxParams(object):
         delta = self.payload_size
         return alpha, beta, gamma, delta
 
+    def get_sphinx_forward_size(self):
+        reduce(lambda a, b: a + b, self.get_dimensions())
+
     def elements_from_raw_bytes(self, raw_packet):
         """
         return the Sphinx packet elements, a 4-tuple
@@ -72,6 +91,12 @@ class SphinxParams(object):
         _gamma = raw_packet[alpha + beta:alpha + beta + gamma]
         _delta = raw_packet[alpha + beta + gamma:]
         return _alpha, _beta, _gamma, _delta
+
+
+@attr.s(frozen=True)
+class ClientMessage(object):
+    message_id = attr.ib(validator=is_16bytes)
+    payload = attr.ib(validator=attr.validators.instance_of(bytes))
 
 
 @attr.s(frozen=True)
@@ -230,86 +255,102 @@ class SphinxPacket(object):
         return cls(header, SphinxBody(delta))
 
 
-def create_reply_block(params, route, pki, dest, rand_reader):
-    """
-    Create a single use reply block, a SURB. Reply blocks are used
-    to achieve recipient anonymity.
-
-    :param SphinxParams params: An instance of SphinxParams.
-
-    :param route: A list of 16 byte mix node IDs.
-
-    :param pki: An IMixPKI provider.
-
-    :param dest: A "prefix free encoded" destination type or client ID.
-
-    :param plaintext_message: The plaintext message.
-
-    :param rand_reader: Source of entropy, an IReader provider.
-
-    :returns: a 3-tuple, a 16 byte message ID, key tuple and reply block tuple
-    """
-    assert IMixPKI.providedBy(pki)
-
-    message_id = rand_reader.read(SECURITY_PARAMETER)
-    block_cipher = SphinxLioness()
-    # Compute the header and the secrets
-    header, secrets = create_header(params, route, pki, destination_encode(dest), message_id, rand_reader)
-
-    # ktilde is 32 bytes because our create_block_cipher_key
-    # requires a 32 byte input. However in the Sphinx reference
-    # implementation the block cipher key creator function called "hpi"
-    # allows any size input. ktilde was previously 16 bytes.
-    ktilde = rand_reader.read(32)
-    keytuple = [ktilde]
-    keytuple.extend([block_cipher.create_block_cipher_key(x) for x in secrets])
-    return message_id, keytuple, (route[0], header, ktilde)
-
-
 @attr.s(frozen=True)
-class ClientMessage(object):
-    identity = attr.ib(validator=attr.validators.instance_of(bytes))
-    payload = attr.ib(validator=attr.validators.instance_of(bytes))
+class ReplyBlockDecryptionToken(object):
+    """
+    I am a single-use decryption token providing decryption of a ciphertext
+    message that was composed using a single-use reply block.
+    """
 
+    message_id = attr.ib(validator=is_16bytes)
+    keys = attr.ib(validator=attr.validators.instance_of(list))
 
-@attr.s
-class SphinxClient(object):
-
-    params = attr.ib(validator=attr.validators.instance_of(SphinxParams))
-    client_id = attr.ib(validator=attr.validators.instance_of(bytes))
-    rand_reader = attr.ib(validator=attr.validators.provides(IReader))
-    _keytable = attr.ib(init=False, default={})
-
-    def create_nym(self, route, pki):
+    def decrypt(self, ciphertext):
         """
-        Create a SURB for the given nym (passing through nllength
-        nodes), and send it to the nymserver.
+        decrypt the ciphertext which was composed using the
+        corresponding reply block.
+        returns a ClientMessage containing the destination and plaintext payload.
         """
-        assert IMixPKI.providedBy(pki)
-
-        message_id, keytuple, nymtuple = create_reply_block(self.params, route, pki, self.client_id, self.rand_reader)
-        self._keytable[message_id] = keytuple
-        return nymtuple
-
-    def decrypt(self, message_id, delta):
-        """
-        decrypt reply message
-        returns a ClientMessage
-        """
-        keytuple = self._keytable.pop(message_id, None)
         block_cipher = SphinxLioness()
-        if keytuple is None:
-            raise NymKeyNotFoundError
-        ktilde = keytuple.pop(0)
-        route_len = len(keytuple)
+        ktilde = self.keys.pop(0)
+        route_len = len(self.keys)
+        delta = ciphertext
         for i in range(route_len - 1, -1, -1):
-            delta = block_cipher.encrypt(keytuple[i], delta)
+            delta = block_cipher.encrypt(self.keys[i], delta)
         delta = block_cipher.decrypt(
             block_cipher.create_block_cipher_key(ktilde), delta
         )
 
         if delta[:SECURITY_PARAMETER] == (b"\x00" * SECURITY_PARAMETER):
             plaintext_message = remove_padding(delta[SECURITY_PARAMETER:])
-            return ClientMessage(identity=self.client_id, payload=plaintext_message)
+            return ClientMessage(self.message_id, plaintext_message)
 
         raise CorruptMessageError
+
+
+@attr.s(frozen=True)
+class ReplyBlock(object):
+    """
+    hello, I'm a single-use encryption/delivery token with a short lifetime,
+    also known as a SURB - single use reply block. Reply blocks are of course
+    vulnerable to deanonymization in the "compulsion threat model" where the
+    adversary can force multiple mix operators to decrypt Sphinx packets.
+
+    Lifetime, is controlled by mix key rotation which is relatively
+    frequent in order to protect against the compulsion
+    threat. However let it be known there are other defenses against
+    the compulsion threat as described in these papers:
+
+    1. Compulsion Resistant Anonymous Communications by George Danezis and Jolyon Clulow
+    https://www.freehaven.net/anonbib/cache/ih05-danezisclulow.pdf
+
+    2. Forward Secure Mixes by by George Danezis
+    https://www.freehaven.net/anonbib/cache/Dan:SFMix03.pdf
+    """
+    header = attr.ib(validator=attr.validators.instance_of(SphinxHeader))
+    destination = attr.ib(validator=is_16bytes)  # first mix hop
+    key = attr.ib(validator=is_32bytes)
+
+    @staticmethod
+    def compose_reply_block(message_id, params, route, pki, dest, rand_reader):
+        """
+        Create a single use reply block and the corresponding decryption token.
+
+        :param SphinxParams params: An instance of SphinxParams.
+
+        :param route: A list of 16 byte mix node IDs.
+
+        :param pki: An IMixPKI provider.
+
+        :param dest: A "prefix free encoded" destination type or client ID.
+
+        :param plaintext_message: The plaintext message.
+
+        :param rand_reader: Source of entropy, an IReader provider.
+
+        :returns: a 3-tuple, a 16 byte message ID, key tuple and reply block tuple
+        """
+        assert IMixPKI.providedBy(pki)
+
+        block_cipher = SphinxLioness()
+        # Compute the header and the secrets
+        header, secrets = create_header(params, route, pki, destination_encode(dest), message_id, rand_reader)
+
+        # ktilde is 32 bytes because our create_block_cipher_key
+        # requires a 32 byte input. However in the Sphinx reference
+        # implementation the block cipher key creator function called "hpi"
+        # allows any size input. ktilde was previously 16 bytes.
+        ktilde = rand_reader.read(32)
+        keys = [ktilde]
+        keys.extend([block_cipher.create_block_cipher_key(x) for x in secrets])
+        return ReplyBlockDecryptionToken(message_id, keys), ReplyBlock(header, route[0], ktilde)
+
+    def compose_forward_message(self, params, message):
+        """
+        compose a sphinx packet
+        """
+        assert isinstance(params, SphinxParams)
+        block_cipher = SphinxLioness()
+        key = block_cipher.create_block_cipher_key(self.key)
+        block = add_padding((b"\x00" * SECURITY_PARAMETER) + message, params.payload_size)
+        return SphinxPacket(self.header, SphinxBody(block_cipher.encrypt(key, block)))

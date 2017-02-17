@@ -12,11 +12,11 @@ from __future__ import with_statement
 from pylioness._metadata import __version__, __author__, __contact__
 from pylioness._metadata import __license__, __copyright__, __url__
 
-from sphinxmixcrypto.errors import CorruptMessageError, NymKeyNotFoundError, IncorrectMACError, SphinxNoSURBSAvailableError
+from sphinxmixcrypto.errors import CorruptMessageError, IncorrectMACError
 from sphinxmixcrypto.errors import ReplayError, HeaderAlphaGroupMismatchError, InvalidMessageTypeError, SphinxBodySizeMismatchError
 
-from sphinxmixcrypto.client import SphinxClient, create_header
-from sphinxmixcrypto.client import create_reply_block, ClientMessage, destination_encode
+from sphinxmixcrypto.client import create_header, ReplyBlock, ReplyBlockDecryptionToken
+from sphinxmixcrypto.client import ClientMessage, destination_encode
 from sphinxmixcrypto.client import SphinxPacket, SphinxHeader, SphinxBody, SphinxParams
 
 from sphinxmixcrypto.node import sphinx_packet_unwrap, prefix_free_decode, SECURITY_PARAMETER
@@ -32,7 +32,6 @@ __all__ = [
     "SECURITY_PARAMETER",
 
     "ReplayError",
-    "NymKeyNotFoundError",
     "CorruptMessageError",
     "SphinxBodySizeMismatchError",
     "InvalidMessageTypeError",
@@ -51,10 +50,8 @@ __all__ = [
     "SphinxBody",
     "ClientMessage",
     "SphinxParams",
-    "SphinxClient",
     "UnwrappedMessage",
     "PacketReplayCacheDict",
-    "Nymserver",
     "GroupCurve25519",
     "SphinxLioness",
     "SphinxStreamCipher",
