@@ -3,6 +3,7 @@ import py.test
 import zope.interface
 import binascii
 import os
+from Cryptodome.Cipher import ChaCha20
 
 from sphinxmixcrypto.crypto_primitives import SphinxLioness, GroupCurve25519
 from sphinxmixcrypto import SphinxHeader, SphinxBody, SphinxPacket, sphinx_packet_unwrap
@@ -62,21 +63,18 @@ def rand_subset(lst, nu):
 
 
 @zope.interface.implementer(IReader)
-class FixedNoiseReader():
-
-    def __init__(self, hexed_noise):
-        self.noise = binascii.unhexlify(hexed_noise)
-        self.count = 0
-        self.fallback = RandReader()
+class ChachaNoiseReader():
+    """
+    hello, i am an entropy "iterator". sphinx uses a source of entropy
+    for generation of key material. i'm deterministic so use me to
+    write deterministic tests.
+    """
+    def __init__(self, seed_string):
+        assert isinstance(seed_string, str) and len(seed_string) == 64
+        self.cipher = ChaCha20.new(key=binascii.unhexlify(seed_string), nonce=b"\x00" * 8)
 
     def read(self, n):
-        if n > len(self.noise):
-            print("%s > %s" % (n, len(self.noise)))
-            return self.fallback.read(n)
-        ret = self.noise[:n]
-        self.noise = self.noise[n:]
-        self.count += n
-        return ret
+        return self.cipher.encrypt(b"\x00" * n)
 
 
 @zope.interface.implementer(IKeyState)
@@ -275,8 +273,7 @@ class TestSphinxEnd2End():
         self.alice_decryption_token, self.reply_block = ReplyBlock.compose_reply_block(message_id, self.params, self.reply_route, self.pki, dest, rand_reader)
 
     def test_sphinx_replay(self):
-        rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
-
+        rand_reader = ChachaNoiseReader("47ade5905376604cde0b57e732936b4298281c8a67b6a62c6107482eb69e2941")
         self.setUpMixVectors(rand_reader, client_id=b"client")
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
@@ -289,7 +286,7 @@ class TestSphinxEnd2End():
         py.test.raises(ReplayError, sphinx_packet_unwrap, params, replay_cache, key_state, packet)
 
     def test_client_surb(self):
-        rand_reader = FixedNoiseReader("b2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
+        rand_reader = ChachaNoiseReader("47ade5905376604cde0b57e732936b4298281c8a67b6a62c6107482eb69e2941")
         self.setUpMixVectors(rand_reader, client_id=b"Client b5451d2e")
         message = b"Open, secure and reliable connectivity is necessary (although not sufficient) to excercise the human rights such as freedom of expression and freedom of association [FOC], as defined in the Universal Declaration of Human Rights [UDHR]."
         sphinx_packet = self.reply_block.compose_forward_message(self.params, message)
@@ -334,7 +331,7 @@ class TestSphinxEnd2End():
         return sphinx_packet_unwrap(params, self.replay_cache_map[destination], self.key_state_map[destination], packet)
 
     def test_end_to_end(self):
-        rand_reader = FixedNoiseReader("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b43c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
+        rand_reader = ChachaNoiseReader("47ade5905376604cde0b57e732936b4298281c8a67b6a62c6107482eb69e2941")
         #  XXX should we make client_ids be strings or what?
         self.setUpMixVectors(rand_reader, client_id=binascii.unhexlify("436c69656e74206564343564326264"))
         message = b"the quick brown fox"
@@ -366,7 +363,7 @@ class TestSphinxEnd2End():
                 return result
 
     def test_sphinx_corrupted_process_message(self):
-        rand_reader = FixedNoiseReader("b5451d2eb2faf3f84bc4778ace6516e73e9da6c597e6f96f7e63c7ca6c9456018be9fd84883e4469a736c66fcaeceacf080fb06bc45859796707548c356c462594d1418b5349daf8fffe21a67affec10c0a2e3639c5bd9e8a9ddde5caf2e1db802995f54beae23305f2241c6517d301808c0946d5895bfd0d4b53d8ab2760e4ec8d4b2309eec239eedbab2c6ae532da37f3b633e256c6b551ed76321cc1f301d74a0a8a0673ea7e489e984543ca05fe0ff373a6f3ed4eeeaafd18292e3b182c25216aeb8")
+        rand_reader = ChachaNoiseReader("47ade5905376604cde0b57e732936b4298281c8a67b6a62c6107482eb69e2941")
         self.setUpMixVectors(rand_reader, client_id=b"client")
         destination = b"dest"
         message = b"this is a test"
@@ -379,7 +376,7 @@ class TestSphinxEnd2End():
         py.test.raises(InvalidProcessDestinationError, self.mixnet_test_corrupted_packet_state_machine, params, result)
 
     def test_sphinx_invalid_message(self):
-        rand_reader = FixedNoiseReader("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b43c78e065c89b26bc7b498dd6c0f24925c67a7ac0d4a191937bc7698f650391")
+        rand_reader = ChachaNoiseReader("47ade5905376604cde0b57e732936b4298281c8a67b6a62c6107482eb69e2941")
         self.setUpMixVectors(rand_reader, client_id=b"client")
         message = b"the quick brown fox"
         params = SphinxParams(5, 1024)
