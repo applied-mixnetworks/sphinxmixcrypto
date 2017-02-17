@@ -1,4 +1,4 @@
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 __author__ = 'David Stainton'
 __contact__ = 'dawuud@riseup.net'
 __url__ = 'https://github.com/applied-mixnetworks/sphinxmixcrypto'
