@@ -24,7 +24,6 @@ from sphinxmixcrypto.node import PacketReplayCacheDict
 from sphinxmixcrypto.node import InvalidProcessDestinationError
 from sphinxmixcrypto.node import UnwrappedMessage
 from sphinxmixcrypto.crypto_primitives import GroupCurve25519, SphinxLioness, SphinxStreamCipher, SphinxDigest
-from sphinxmixcrypto.nym_server import Nymserver
 from sphinxmixcrypto.padding import add_padding, remove_padding
 from sphinxmixcrypto.interfaces import IReader, IMixPKI, IPacketReplayCache, IKeyState
 
