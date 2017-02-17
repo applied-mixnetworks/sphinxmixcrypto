@@ -110,6 +110,12 @@ class DummyPKI(object):
     def identities(self):
         return self.node_map.keys()
 
+    def set_client_addr(self, transport_name, client_id, addr):
+        pass
+
+    def get_client_addr(self, transport_name, client_id):
+        pass
+
     def get_mix_addr(self, transport_name, node_id):
         return self.addr_map[node_id]
 

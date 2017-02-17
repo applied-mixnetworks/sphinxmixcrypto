@@ -41,6 +41,15 @@ class IMixPKI(zope.interface.Interface):
         return a list of key ID's
         -> [node_id]
         """
+    def set_client_addr(self, transport_name, client_id, addr):
+        """
+        set the address of a client
+        """
+
+    def get_client_addr(self, transport_name, client_id):
+        """
+        get the address of a client
+        """
 
     def get_mix_addr(self, transport_name, node_id):
         """
