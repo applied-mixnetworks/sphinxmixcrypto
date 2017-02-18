@@ -17,6 +17,7 @@
 # <http://www.gnu.org/licenses/>.
 
 import attr
+import functools
 
 from sphinxmixcrypto.crypto_primitives import CURVE25519_SIZE
 from sphinxmixcrypto.crypto_primitives import SECURITY_PARAMETER, xor
@@ -77,7 +78,7 @@ class SphinxParams(object):
         return alpha, beta, gamma, delta
 
     def get_sphinx_forward_size(self):
-        return reduce(lambda a, b: a + b, self.get_dimensions(), 0)
+        return functools.reduce(lambda a, b: a + b, self.get_dimensions(), 0)
 
     def elements_from_raw_bytes(self, raw_packet):
         """
