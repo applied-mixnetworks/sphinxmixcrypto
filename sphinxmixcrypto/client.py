@@ -332,10 +332,9 @@ class ReplyBlock(object):
         :returns: a 3-tuple, a 16 byte message ID, key tuple and reply block tuple
         """
         assert IMixPKI.providedBy(pki)
-
         block_cipher = SphinxLioness()
         # Compute the header and the secrets
-        header, secrets = create_header(params, route, pki, destination_encode(dest), message_id, rand_reader)
+        header, secrets = create_header(params, route, pki, dest, message_id, rand_reader)
 
         # ktilde is 32 bytes because our create_block_cipher_key
         # requires a 32 byte input. However in the Sphinx reference
