@@ -271,11 +271,9 @@ class TestSphinxEnd2End():
             key_state = SphinxNodeKeyState(hexedState[i]['private_key'])
             self.key_state_map[hexedState[i]['id']] = key_state
 
-        message_id = binascii.unhexlify("ff81855a360000000000000000000000")
         self.reply_route = []
         for s in hexedState:
             self.reply_route.append(s['id'])
-        dest = binascii.unhexlify("0f436c69656e74206665656463383061")
 
     def test_sphinx_replay(self):
         rand_reader = ChachaNoiseReader("47ade5905376604cde0b57e732936b4298281c8a67b6a62c6107482eb69e2941")
@@ -314,7 +312,7 @@ class TestSphinxEnd2End():
         while True:
             if result.next_hop:
                 if result.next_hop[0] == binascii.unhexlify(self.match_hop):
-                    #print "SPHINX PACKET alpha %s beta %s gamma %s delta %s" % (binascii.hexlify(result.next_hop[1].header.alpha), binascii.hexlify(result.next_hop[1].header.beta), binascii.hexlify(result.next_hop[1].header.gamma), binascii.hexlify(result.next_hop[1].body.delta))
+                    # print "SPHINX PACKET alpha %s beta %s gamma %s delta %s" % (binascii.hexlify(result.next_hop[1].header.alpha), binascii.hexlify(result.next_hop[1].header.beta), binascii.hexlify(result.next_hop[1].header.gamma), binascii.hexlify(result.next_hop[1].body.delta))
                     assert result.next_hop[1].header.alpha == self.alpha
                     assert result.next_hop[1].header.beta == self.beta
                     assert result.next_hop[1].header.gamma == self.gamma
@@ -348,7 +346,6 @@ class TestSphinxEnd2End():
         params = SphinxParams(5, 1024)
         packet = SphinxPacket.forward_message(params, self.route, self.pki,
                                               self.route[-1], message, rand_reader)
-        #print "--------------- alpha %s beta %s gamma %s delta %s\n\n" % (binascii.hexlify(packet.header.alpha), binascii.hexlify(packet.header.beta), binascii.hexlify(packet.header.gamma), binascii.hexlify(packet.body.delta))
         replay_cache = PacketReplayCacheDict()
         key_state = SphinxNodeKeyState(self.private_key_map[self.route[0]])
         result = sphinx_packet_unwrap(params, replay_cache, key_state, packet)
