@@ -5,7 +5,7 @@ from sphinxmixcrypto.crypto_primitives import GroupCurve25519, SphinxDigest, Sph
 from pylioness.lioness import Chacha20_Blake2b_Lioness
 
 
-def test_eccgroup():
+def test_eccgroup_fixed_vector():
     g = GroupCurve25519()
     secret = binascii.unhexlify("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b4")
     x = g.makesecret(secret)
@@ -14,6 +14,22 @@ def test_eccgroup():
     want = binascii.unhexlify("56f7f7946e62a79f2a4440cc5ca459a9d1b080c5972014c782230fa38cfe8277")
     assert alpha == want
 
+def test_ed25519_decisional_diffiehellman_assumption():
+    """
+    test that the decisional diffie hellman assumption is satisfied
+    """
+    group = GroupCurve25519()
+    key_data = binascii.unhexlify("82c8ad63392a5f59347b043e1244e68d52eb853921e2656f188d33e59a1410b4")
+    private_key = group.makesecret(key_data)
+    public_key = group.expon(group.generator, private_key)
+
+    data = binascii.unhexlify("4171bd9a48a58cf7579e9fa662fe0ac2acb8c6eed3056cd970fd35dd4d026cae")
+    blind_factor = group.makesecret(data)
+
+    alpha = group.expon(group.generator, blind_factor)
+    shared_secret = group.expon(public_key, blind_factor)
+    new_shared_secret = group.expon(alpha, private_key)
+    assert new_shared_secret == shared_secret
 
 def test_blinding_hash():
     digest = SphinxDigest()
