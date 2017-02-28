@@ -49,17 +49,10 @@ Both projects contain the same unit test vectors.
 install
 -------
 
-You should install into a python virtual env.
+Pypi packages available
 
-Install pylioness from here:
+  pip install sphinxmixcrypto
 
-- https://github.com/applied-mixnetworks/pylioness
-
-
-You can install it like this::
-
-  pip install git+https://github.com/applied-mixnetworks/pylioness.git
-
-and then install this package::
+or install from github into a python virtual env
 
   pip install git+https://github.com/applied-mixnetworks/sphinxmixcrypto.git
