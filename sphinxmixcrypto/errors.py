@@ -43,27 +43,7 @@ class InvalidMessageTypeError(Exception):
     pass
 
 
-class NoSURBSAvailableError(Exception):
-    pass
-
-
-class KeyMismatchError(Exception):
-    pass
-
-
 class SphinxBodySizeMismatchError(Exception):
-    pass
-
-
-# nymserver errors
-
-class SphinxNoSURBSAvailableError(Exception):
-    pass
-
-
-# client errors
-
-class NymKeyNotFoundError(Exception):
     pass
 
 
