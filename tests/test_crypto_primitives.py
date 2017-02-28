@@ -14,6 +14,7 @@ def test_eccgroup_fixed_vector():
     want = binascii.unhexlify("56f7f7946e62a79f2a4440cc5ca459a9d1b080c5972014c782230fa38cfe8277")
     assert alpha == want
 
+
 def test_ed25519_decisional_diffiehellman_assumption():
     """
     test that the decisional diffie hellman assumption is satisfied
@@ -30,6 +31,7 @@ def test_ed25519_decisional_diffiehellman_assumption():
     shared_secret = group.expon(public_key, blind_factor)
     new_shared_secret = group.expon(alpha, private_key)
     assert new_shared_secret == shared_secret
+
 
 def test_blinding_hash():
     digest = SphinxDigest()
